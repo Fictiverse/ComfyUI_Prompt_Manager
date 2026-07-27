@@ -4,6 +4,9 @@ A node that manages a fully editable, categorized library of reusable prompt
 snippets, with a native multiline "Prompt" text box, presets stored on disk,
 per-section enable/disable, and queue-time randomization.
 
+<img width="815" height="718" alt="20260727_114233" src="https://github.com/user-attachments/assets/d023f6f5-a753-4021-92d1-99b13ab55042" />
+
+
 ## Installation
 
 1. Copy the whole `prompt_manager_node` folder into `ComfyUI/custom_nodes/`.
