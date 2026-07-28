@@ -235,6 +235,66 @@ function cleanupServerImage(filename) {
   fetch(`/prompt_manager/images/${filename}`, { method: "DELETE" }).catch(() => {});
 }
 
+// Turns a server-stored filename reference into an inline base64 data URL,
+// for building a self-contained (shareable) export.
+async function fetchImageAsDataURL(filename) {
+  const res = await fetch(`/prompt_manager/images/${filename}`);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const blob = await res.blob();
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Mutates `items` in place, replacing each server filename reference with
+// an inline base64 data URL. Used right before saving/exporting, so the
+// resulting file is fully self-contained and portable.
+async function embedImagesInItems(items) {
+  for (const it of items) {
+    if (it.image && !it.image.startsWith("data:")) {
+      try {
+        it.image = await fetchImageAsDataURL(it.image);
+      } catch (e) {
+        // leave the reference as-is if the file is missing/unreachable —
+        // the export still works, just without that one picture.
+      }
+    }
+  }
+}
+
+// The reverse direction: mutates `dataObj.categories` in place, uploading
+// any inline base64 image to the server and replacing it with the
+// returned filename reference. Used right after loading data from
+// anywhere (a preset, an imported section, a restored workflow) so the
+// live, actively-edited node always converges back to the lightweight
+// form — regardless of whether the source file was self-contained or not.
+// Returns true if anything was converted (i.e. the caller should persist).
+async function localizeImages(dataObj) {
+  let changed = false;
+  for (const key of Object.keys(dataObj.categories || {})) {
+    const items = dataObj.categories[key] || [];
+    for (const it of items) {
+      if (it.image && it.image.startsWith("data:")) {
+        try {
+          const res = await fetchJSON("/prompt_manager/images", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: it.image }),
+          });
+          it.image = res.filename;
+          changed = true;
+        } catch (e) {
+          console.warn("PromptManager: failed to localize an embedded image", e);
+        }
+      }
+    }
+  }
+  return changed;
+}
+
 function resizeImageFile(file, maxDim = 220) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -568,10 +628,12 @@ app.registerExtension({
         renderAll();
       }
 
-      function exportSection() {
+      async function exportSection() {
         const sec = activeSection();
         if (!sec || sec.locked) return;
-        const payload = { pmSection: true, label: sec.label, items: activeItems() };
+        const items = JSON.parse(JSON.stringify(activeItems()));
+        await embedImagesInItems(items);
+        const payload = { pmSection: true, label: sec.label, items };
         download(`${slugify(sec.label)}.json`, JSON.stringify(payload, null, 2));
       }
 
@@ -597,6 +659,12 @@ app.registerExtension({
         state.activeTab = key;
         persist();
         renderAll();
+        localizeImages(node.pmData).then((changed) => {
+          if (changed) {
+            persist();
+            renderAll();
+          }
+        });
       }
 
       // --- Preset picker -------------------------------------------------------------
@@ -637,6 +705,12 @@ app.registerExtension({
           state.activeTab = node.pmData.sections.length ? node.pmData.sections[0].key : null;
           persist();
           renderAll();
+          localizeImages(node.pmData).then((changed) => {
+            if (changed) {
+              persist();
+              renderAll();
+            }
+          });
           fetch("/prompt_manager/last_used", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -740,10 +814,14 @@ app.registerExtension({
             if (!name || !name.trim()) return;
             const clean = name.trim();
             try {
+              const embedded = JSON.parse(JSON.stringify(node.pmData));
+              for (const key of Object.keys(embedded.categories)) {
+                await embedImagesInItems(embedded.categories[key]);
+              }
               await fetchJSON(`/prompt_manager/presets/${encodeURIComponent(clean)}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(node.pmData),
+                body: JSON.stringify(embedded),
               });
               await refreshPresetSelect(clean);
             } catch (e) {
@@ -1234,6 +1312,12 @@ app.registerExtension({
       persist();
       renderAll();
       refreshPresetSelect().catch(() => {});
+      localizeImages(node.pmData).then((changed) => {
+        if (changed) {
+          persist();
+          renderAll();
+        }
+      });
 
       return r;
     };
@@ -1247,6 +1331,14 @@ app.registerExtension({
           this.pmData = sanitizeData(JSON.parse(dw.value));
           const fn = renderRegistry.get(this);
           if (fn) fn();
+          localizeImages(this.pmData).then((changed) => {
+            if (changed) {
+              dw.value = JSON.stringify(this.pmData);
+              this.setDirtyCanvas(true, true);
+              const fn2 = renderRegistry.get(this);
+              if (fn2) fn2();
+            }
+          });
         }
       } catch (e) {
         console.warn("PromptManager: failed to restore data", e);
