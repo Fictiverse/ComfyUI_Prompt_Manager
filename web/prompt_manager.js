@@ -111,10 +111,8 @@ if (!document.getElementById(STYLE_ID)) {
 
   .pm-form { background:#202020; padding:8px; display:flex; flex-direction:column; gap:6px; }
   .pm-form input[type=text], .pm-form textarea { background:#101010; border:none; color:#ddd; font-family:inherit; font-size:12px; padding:6px; resize:vertical; width:100%; box-sizing:border-box; border-radius:0; }
-  .pm-form textarea { min-height:48px; }
-  .pm-form-row { display:flex; gap:6px; align-items:center; }
+  .pm-form textarea { min-height:96px; }
   .pm-form-actions { display:flex; gap:6px; justify-content:flex-end; }
-  .pm-form-thumb { width:42px; height:42px; object-fit:cover; background:#111; border-radius:0; }
 
   .pm-empty-hint { color:#555; text-align:center; padding:16px 4px; font-style:italic; width:100%; }
   .pm-hidden-file { display:none; }
@@ -220,6 +218,23 @@ function computePreview(data, rawText) {
   return parts.join(". ");
 }
 
+// Images are uploaded to the server and referenced by filename (see
+// server_routes.py) rather than embedded as base64 in prompt_data — that
+// keeps the workflow JSON small, which avoids ComfyUI's browser-side
+// "Failed to save workflow draft" autosave failing once the graph exceeds
+// the localStorage quota. Older presets that still hold a raw data: URL
+// keep working as-is (rendered directly) for backward compatibility.
+function imageSrc(item) {
+  if (!item || !item.image) return null;
+  if (item.image.startsWith("data:")) return item.image;
+  return `/prompt_manager/images/${item.image}`;
+}
+
+function cleanupServerImage(filename) {
+  if (!filename || filename.startsWith("data:")) return;
+  fetch(`/prompt_manager/images/${filename}`, { method: "DELETE" }).catch(() => {});
+}
+
 function resizeImageFile(file, maxDim = 220) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -292,6 +307,13 @@ async function fetchJSON(url, opts) {
   return body;
 }
 
+// Per-node render function, kept OUT of the node object itself (never
+// `node.pmRenderAll = fn`). LiteGraph nodes can end up passing through
+// generic (de)serialization paths (undo history, drafts, etc.) that don't
+// expect function-valued properties; a WeakMap keeps this purely a runtime,
+// in-memory concern.
+const renderRegistry = new WeakMap();
+
 // Applies the randomize-on-queue logic to every PromptManager node in the
 // graph. Deterministic per (seed, section key) via a tiny seeded PRNG.
 function applyQueueRandomization(appRef) {
@@ -315,7 +337,8 @@ function applyQueueRandomization(appRef) {
     });
     if (changed) {
       dataWidget.value = JSON.stringify(n.pmData);
-      if (n.pmRenderAll) n.pmRenderAll();
+      const fn = renderRegistry.get(n);
+      if (fn) fn();
     }
   });
 }
@@ -446,13 +469,24 @@ app.registerExtension({
       fileInput.addEventListener("change", async () => {
         const f = fileInput.files && fileInput.files[0];
         fileInput.value = "";
-        if (!f || !fileInputTarget || fileInputTarget === "__form__") return;
-        const dataUrl = await resizeImageFile(f);
-        const item = activeItems().find((it) => it.id === fileInputTarget);
-        if (item) {
-          item.image = dataUrl;
+        if (!f || !fileInputTarget) return;
+        const targetId = fileInputTarget;
+        const item = activeItems().find((it) => it.id === targetId);
+        if (!item) return;
+        try {
+          const dataUrl = await resizeImageFile(f);
+          const res = await fetchJSON("/prompt_manager/images", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: dataUrl }),
+          });
+          const oldImage = item.image;
+          item.image = res.filename;
           persist();
           renderList();
+          cleanupServerImage(oldImage);
+        } catch (e) {
+          alert("Failed to upload image: " + e.message);
         }
       });
 
@@ -512,17 +546,24 @@ app.registerExtension({
           alert("You need to keep at least one (non-locked) section.");
           return;
         }
-        const count = (node.pmData.categories[sec.key] || []).length;
-        if (!confirm(`Delete section "${sec.label}" and its ${count} prompt(s)? This cannot be undone.`)) return;
+        const removedItems = node.pmData.categories[sec.key] || [];
+        if (!confirm(`Delete section "${sec.label}" and its ${removedItems.length} prompt(s)? This cannot be undone.`)) return;
         node.pmData.sections = node.pmData.sections.filter((s) => s.key !== sec.key);
         delete node.pmData.categories[sec.key];
         state.activeTab = node.pmData.sections.length ? node.pmData.sections[0].key : null;
         persist();
         renderAll();
+        removedItems.forEach((it) => cleanupServerImage(it.image));
       }
 
       function toggleSectionEnabled(sec) {
         sec.enabled = !sec.enabled;
+        persist();
+        renderAll();
+      }
+
+      function soloSection(sec) {
+        node.pmData.sections.forEach((s) => (s.enabled = s.key === sec.key));
         persist();
         renderAll();
       }
@@ -768,6 +809,9 @@ app.registerExtension({
           hint.className = "pm-hint";
           hint.textContent = "Raw text — edit the box above. Drag this tab to reposition it.";
           sectionToolbarEl.appendChild(hint);
+          sectionToolbarEl.appendChild(
+            mkBtn("target", "", "Enable only this section (disables all others)", () => soloSection(sec))
+          );
           return;
         }
 
@@ -794,14 +838,20 @@ app.registerExtension({
         clearBtn.disabled = selectedCount === 0;
         sectionToolbarEl.appendChild(clearBtn);
 
+        sectionToolbarEl.appendChild(
+          mkBtn("target", "", "Enable only this section (disables all others)", () => soloSection(sec))
+        );
+
         const sep0 = document.createElement("div");
         sep0.className = "pm-sep";
         sectionToolbarEl.appendChild(sep0);
 
         const delBtn = mkBtn("trash", "danger", "Delete selected", () => {
+          const removed = items.filter((it) => it.selected);
           node.pmData.categories[state.activeTab] = items.filter((it) => !it.selected);
           persist();
           renderAll();
+          removed.forEach((it) => cleanupServerImage(it.image));
         }, selectedCount || "");
         delBtn.disabled = selectedCount === 0;
         sectionToolbarEl.appendChild(delBtn);
@@ -897,29 +947,9 @@ app.registerExtension({
         const promptInput = document.createElement("textarea");
         promptInput.placeholder = "Prompt text (injected into the final output)";
         promptInput.value = item ? item.prompt : "";
-
-        const row = document.createElement("div");
-        row.className = "pm-form-row";
-        const thumb = document.createElement("img");
-        thumb.className = "pm-form-thumb";
-        thumb.src = item && item.image ? item.image : "";
-        thumb.style.visibility = item && item.image ? "visible" : "hidden";
-        const imgBtn = mkBtn("image", "", "Set image", () => {
-          fileInputTarget = "__form__";
-          fileInput.click();
-        });
-        row.appendChild(thumb);
-        row.appendChild(imgBtn);
-
-        let pendingImage = item ? item.image : null;
-        const formFileHandler = async () => {
-          const f = fileInput.files && fileInput.files[0];
-          if (!f) return;
-          const dataUrl = await resizeImageFile(f);
-          pendingImage = dataUrl;
-          thumb.src = dataUrl;
-          thumb.style.visibility = "visible";
-        };
+        // Image is set separately via the dedicated 🖼 icon on the card/tile
+        // (kept out of this form to avoid a redundant control and to leave
+        // more room for the prompt text itself).
 
         const actions = document.createElement("div");
         actions.className = "pm-form-actions";
@@ -934,9 +964,8 @@ app.registerExtension({
           if (item) {
             item.name = name;
             item.prompt = promptText;
-            item.image = pendingImage;
           } else {
-            activeItems().push({ id: uid(), name, prompt: promptText, image: pendingImage, selected: false });
+            activeItems().push({ id: uid(), name, prompt: promptText, image: null, selected: false });
           }
           persist();
           closeForm();
@@ -947,28 +976,12 @@ app.registerExtension({
 
         formEl.appendChild(nameInput);
         formEl.appendChild(promptInput);
-        formEl.appendChild(row);
         formEl.appendChild(actions);
-
-        if (fileInput._pmHandler) fileInput.removeEventListener("change", fileInput._pmHandler);
-        const handler = async () => {
-          if (fileInputTarget === "__form__") {
-            await formFileHandler();
-            fileInputTarget = null;
-            fileInput.value = "";
-          }
-        };
-        fileInput.addEventListener("change", handler);
-        fileInput._pmHandler = handler;
       }
 
       function closeForm() {
         formEl.style.display = "none";
         formEl.innerHTML = "";
-        if (fileInput._pmHandler) {
-          fileInput.removeEventListener("change", fileInput._pmHandler);
-          fileInput._pmHandler = null;
-        }
       }
 
       // --- Render: card / tile list (zone 4) ---------------------------------------------
@@ -1025,6 +1038,7 @@ app.registerExtension({
           node.pmData.categories[state.activeTab] = activeItems().filter((it) => it.id !== item.id);
           persist();
           renderAll();
+          cleanupServerImage(item.image);
         });
         wrap.appendChild(soloBtn);
         wrap.appendChild(editBtn);
@@ -1068,10 +1082,11 @@ app.registerExtension({
         handle.title = "Drag to reorder";
 
         let thumbEl;
-        if (item.image) {
+        const src = imageSrc(item);
+        if (src) {
           thumbEl = document.createElement("img");
           thumbEl.className = "pm-thumb";
-          thumbEl.src = item.image;
+          thumbEl.src = src;
         } else {
           thumbEl = document.createElement("div");
           thumbEl.className = "pm-thumb-empty";
@@ -1104,10 +1119,11 @@ app.registerExtension({
         attachDragReorder(tile, index);
 
         let thumbEl;
-        if (item.image) {
+        const src = imageSrc(item);
+        if (src) {
           thumbEl = document.createElement("img");
           thumbEl.className = "pm-tile-thumb";
-          thumbEl.src = item.image;
+          thumbEl.src = src;
         } else {
           thumbEl = document.createElement("div");
           thumbEl.className = "pm-tile-thumb-empty";
@@ -1180,7 +1196,7 @@ app.registerExtension({
         updatePreview();
       }
 
-      node.pmRenderAll = renderAll;
+      renderRegistry.set(node, renderAll);
 
       // --- DOM widget: height comes ONLY from the stored pmDesiredHeight snapshot ------
       function reservedHeight() {
@@ -1229,7 +1245,8 @@ app.registerExtension({
         const dw = this.widgets && this.widgets.find((w) => w.name === "prompt_data");
         if (dw && dw.value) {
           this.pmData = sanitizeData(JSON.parse(dw.value));
-          if (this.pmRenderAll) this.pmRenderAll();
+          const fn = renderRegistry.get(this);
+          if (fn) fn();
         }
       } catch (e) {
         console.warn("PromptManager: failed to restore data", e);
