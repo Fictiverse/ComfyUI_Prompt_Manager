@@ -1,0 +1,14 @@
+[project]
+name = "ComfyUI Prompt Manager"
+description = " Prompt manager, prompt crafter, visual prompt"
+version = "1.0.0"
+license = { file = "LICENSE.txt" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/Fictiverse/ComfyUI_Prompt_Manager"
+
+[tool.comfy]
+PublisherId = "fictiverse"
+DisplayName = "Fictiverse"
+Icon = ""
