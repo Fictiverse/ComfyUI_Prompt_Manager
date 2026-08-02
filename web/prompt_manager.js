@@ -19,6 +19,7 @@ const ICONS = {
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
   eyeOff: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/><line x1="3" y1="3" x2="21" y2="21"/>',
   dice: '<rect x="4" y="4" width="16" height="16"/><circle cx="9" cy="9" r="1.3"/><circle cx="15" cy="9" r="1.3"/><circle cx="9" cy="15" r="1.3"/><circle cx="15" cy="15" r="1.3"/><circle cx="12" cy="12" r="1.3"/>',
+  diceOff: '<rect x="4" y="4" width="16" height="16"/><circle cx="9" cy="9" r="1.3"/><circle cx="15" cy="9" r="1.3"/><circle cx="9" cy="15" r="1.3"/><circle cx="15" cy="15" r="1.3"/><circle cx="12" cy="12" r="1.3"/><line x1="3" y1="3" x2="21" y2="21"/>',
   grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
   list: '<line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>',
   save: '<path d="M4 4h13l3 3v13H4z"/><path d="M8 4v6h8V4"/><rect x="8" y="14" width="8" height="4"/>',
@@ -27,6 +28,7 @@ const ICONS = {
   handle: '<circle cx="8" cy="6" r="1.4"/><circle cx="16" cy="6" r="1.4"/><circle cx="8" cy="12" r="1.4"/><circle cx="16" cy="12" r="1.4"/><circle cx="8" cy="18" r="1.4"/><circle cx="16" cy="18" r="1.4"/>',
   close: '<line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-3.1-6.8"/><path d="M21 3v6h-6"/>',
 };
 
 function svgIcon(name, size) {
@@ -49,13 +51,20 @@ if (!document.getElementById(STYLE_ID)) {
     font-family: "Consolas","Courier New",monospace; font-size: 12px;
     box-sizing: border-box; overflow: hidden; border-radius: 0;
   }
-  .pm-zone-tabs { background:#0e0e0e; display:flex; flex-wrap:wrap; gap:2px; padding:6px; }
+  .pm-root, .pm-root * { box-sizing: border-box; }
+  .pm-zone-tabs { background:#0e0e0e; display:flex; flex-wrap:wrap; gap:4px; padding:6px; }
+  .pm-tab-mini-btn { background:none; border:none; color:inherit; cursor:pointer; padding:0; display:flex; opacity:0.55; }
+  .pm-tab-mini-btn:hover { opacity:1; }
+  .pm-tab-mini-btn.on-enable { opacity:1; color:#7fd48a; }
+  .pm-tab-mini-btn.on-dice { opacity:1; color:#c9b4ff; }
   .pm-zone-preset { background:#202020; display:flex; flex-wrap:wrap; gap:4px; padding:5px 6px; align-items:center; }
   .pm-zone-options { background:#1a1a1a; display:flex; flex-wrap:wrap; gap:4px; padding:5px 6px; align-items:center; }
   .pm-zone-list { background:#141414; flex:1; overflow-y:auto; padding:6px; }
   .pm-zone-preview { background:#0e0e0e; padding:5px 8px; font-size:11px; color:#7fd48a; max-height:48px; overflow-y:auto; white-space:pre-wrap; flex-shrink:0; }
 
-  .pm-tab { display:flex; align-items:center; gap:5px; padding:6px 10px; background:#262626; cursor:pointer; color:#aaa; white-space:nowrap; border-radius:0; }
+  .pm-tab { display:flex; align-items:center; gap:5px; padding:7px 12px; background:#262626; cursor:pointer; color:#aaa; white-space:nowrap; border-radius:0; min-width:96px; box-sizing:border-box; }
+  .pm-tab-icons { display:flex; align-items:center; gap:4px; }
+  .pm-tab-sep { width:1px; align-self:stretch; background:#444; margin:0 6px 0 5px; }
   .pm-tab:hover { color:#fff; background:#333; }
   .pm-tab.active { background:#3f9c58; color:#fff; }
   .pm-tab.pm-tab-disabled { opacity:0.4; }
@@ -63,9 +72,7 @@ if (!document.getElementById(STYLE_ID)) {
   .pm-tab.pm-tab-locked.active { background:#5b3f96; color:#fff; }
   .pm-tab .pm-count { color:#8a8a8a; font-size:10px; }
   .pm-tab.active .pm-count { color:#e2f5e8; }
-  .pm-tab-toggle { background:none; border:none; color:inherit; cursor:pointer; padding:0; display:flex; opacity:0.85; }
-  .pm-tab-toggle:hover { opacity:1; }
-  .pm-tab-add { background:#1c1c1c; color:#666; }
+  .pm-tab-add { background:#1c1c1c; color:#666; min-width:0; }
   .pm-tab-add:hover { color:#3f9c58; background:#20301f; }
 
   .pm-btn { display:inline-flex; align-items:center; gap:4px; background:#2a2a2a; border:none; color:#ccc; padding:6px 8px; cursor:pointer; border-radius:0; font-family:inherit; font-size:11px; line-height:1; }
@@ -374,6 +381,15 @@ async function fetchJSON(url, opts) {
 // in-memory concern.
 const renderRegistry = new WeakMap();
 
+// Per-node function that directly forces the UI panel's DOM height. Kept
+// out of the node object itself for the same reason as renderRegistry.
+// Needed because relying solely on the widget's computeSize isn't enough:
+// LiteGraph uses it to size the *slot* it reserves for the widget, but
+// doesn't reliably reflect that back into the actual DOM element's style
+// on every resize — without this, resizing the node taller just opens up
+// empty space below the panel instead of the panel growing into it.
+const applyHeightRegistry = new WeakMap();
+
 // Applies the randomize-on-queue logic to every PromptManager node in the
 // graph. Deterministic per (seed, section key) via a tiny seeded PRNG.
 function applyQueueRandomization(appRef) {
@@ -440,7 +456,25 @@ app.registerExtension({
       if (Array.isArray(size) && typeof size[1] === "number") {
         this.pmDesiredHeight = Math.max(200, Math.min(4000, size[1]));
       }
+      const applyFn = applyHeightRegistry.get(this);
+      if (applyFn) applyFn();
       this.setDirtyCanvas(true, true);
+      return r;
+    };
+
+    // Belt-and-suspenders: LiteGraph can grow a node's real size[1] on its
+    // own (e.g. to fit an extra widget we didn't account for) without ever
+    // calling onResize, which used to leave a stale gap below the panel.
+    // Re-sync the DOM height from the node's live, authoritative size on
+    // every draw instead of only reacting to explicit user resizes. This
+    // only ever *reads* node.size to set a DOM style (a one-way leaf
+    // consumer) — it never feeds back into computeSize/node.size, so it
+    // can't reintroduce the earlier feedback-loop bug.
+    const onDrawForeground = nodeType.prototype.onDrawForeground;
+    nodeType.prototype.onDrawForeground = function (ctx) {
+      const r = onDrawForeground ? onDrawForeground.apply(this, arguments) : undefined;
+      const applyFn = applyHeightRegistry.get(this);
+      if (applyFn) applyFn();
       return r;
     };
 
@@ -458,6 +492,24 @@ app.registerExtension({
         dataWidget.computeSize = () => [0, -4];
         if (dataWidget.inputEl) dataWidget.inputEl.style.display = "none";
         dataWidget.draw = function () {};
+      }
+
+      // By default ComfyUI's multiline text widget stretches to fill extra
+      // node height on its own, competing with our custom UI for any space
+      // gained by resizing the node vertically. Pin it to a fixed height
+      // instead (still manually resizable via the textarea's own native
+      // resize handle) so all vertical resize headroom goes to the UI below
+      // it, not the text box.
+      if (rawPromptWidget) {
+        const RAW_PROMPT_DEFAULT_HEIGHT = 90;
+        if (rawPromptWidget.inputEl && !rawPromptWidget.inputEl.style.height) {
+          rawPromptWidget.inputEl.style.height = RAW_PROMPT_DEFAULT_HEIGHT + "px";
+        }
+        rawPromptWidget.computeSize = function (width) {
+          const h =
+            (rawPromptWidget.inputEl && rawPromptWidget.inputEl.offsetHeight) || RAW_PROMPT_DEFAULT_HEIGHT;
+          return [width, h];
+        };
       }
 
       let initial = {};
@@ -508,8 +560,8 @@ app.registerExtension({
       const previewEl = document.createElement("div");
       previewEl.className = "pm-zone-preview";
 
-      root.appendChild(tabsEl);
       root.appendChild(presetRowEl);
+      root.appendChild(tabsEl);
       root.appendChild(sectionToolbarEl);
       root.appendChild(formEl);
       root.appendChild(listEl);
@@ -573,7 +625,7 @@ app.registerExtension({
       function toggleRandomizeOnQueue(sec) {
         sec.randomizeOnQueue = !sec.randomizeOnQueue;
         persist();
-        renderSectionToolbar();
+        renderAll();
       }
 
       // --- Section management -----------------------------------------------------
@@ -618,6 +670,32 @@ app.registerExtension({
 
       function toggleSectionEnabled(sec) {
         sec.enabled = !sec.enabled;
+        persist();
+        renderAll();
+      }
+
+      function enableAllSections() {
+        node.pmData.sections.forEach((s) => (s.enabled = true));
+        persist();
+        renderAll();
+      }
+
+      function disableAllSections() {
+        node.pmData.sections.forEach((s) => (s.enabled = false));
+        persist();
+        renderAll();
+      }
+
+      function randomizeAllSections() {
+        node.pmData.sections.forEach((s) => {
+          if (!s.locked) s.randomizeOnQueue = true;
+        });
+        persist();
+        renderAll();
+      }
+
+      function disableRandomizeAllSections() {
+        node.pmData.sections.forEach((s) => (s.randomizeOnQueue = false));
         persist();
         renderAll();
       }
@@ -693,6 +771,25 @@ app.registerExtension({
         presetSelect.value = names.includes(want) ? want : "";
       }
 
+      async function loadPresetByName(name) {
+        const parsed = await fetchJSON(`/prompt_manager/presets/${encodeURIComponent(name)}`);
+        node.pmData = sanitizeData(parsed);
+        state.activeTab = node.pmData.sections.length ? node.pmData.sections[0].key : null;
+        persist();
+        renderAll();
+        localizeImages(node.pmData).then((changed) => {
+          if (changed) {
+            persist();
+            renderAll();
+          }
+        });
+        fetch("/prompt_manager/last_used", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        }).catch(() => {});
+      }
+
       const presetSelect = document.createElement("select");
       presetSelect.className = "pm-select";
       presetSelect.title = "Saved presets";
@@ -700,22 +797,7 @@ app.registerExtension({
         const name = presetSelect.value;
         if (!name) return;
         try {
-          const parsed = await fetchJSON(`/prompt_manager/presets/${encodeURIComponent(name)}`);
-          node.pmData = sanitizeData(parsed);
-          state.activeTab = node.pmData.sections.length ? node.pmData.sections[0].key : null;
-          persist();
-          renderAll();
-          localizeImages(node.pmData).then((changed) => {
-            if (changed) {
-              persist();
-              renderAll();
-            }
-          });
-          fetch("/prompt_manager/last_used", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name }),
-          }).catch(() => {});
+          await loadPresetByName(name);
         } catch (e) {
           alert("Failed to load preset: " + e.message);
         }
@@ -749,6 +831,39 @@ app.registerExtension({
             (!s.enabled ? " pm-tab-disabled" : "");
           tab.draggable = true;
 
+          const iconsWrap = document.createElement("div");
+          iconsWrap.className = "pm-tab-icons";
+
+          const enableBtn = document.createElement("button");
+          enableBtn.className = "pm-tab-mini-btn" + (s.enabled ? " on-enable" : "");
+          enableBtn.innerHTML = svgIcon(s.enabled ? "eye" : "eyeOff", 13);
+          enableBtn.title = s.enabled ? "Section enabled — click to disable" : "Section disabled — click to enable";
+          enableBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleSectionEnabled(s);
+          });
+          iconsWrap.appendChild(enableBtn);
+
+          if (!s.locked) {
+            const diceBtn = document.createElement("button");
+            diceBtn.className = "pm-tab-mini-btn" + (s.randomizeOnQueue ? " on-dice" : "");
+            diceBtn.innerHTML = svgIcon("dice", 13);
+            diceBtn.title = s.randomizeOnQueue
+              ? "Randomize on queue: ON — click to disable"
+              : "Randomize on queue: OFF — click to enable";
+            diceBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              toggleRandomizeOnQueue(s);
+            });
+            iconsWrap.appendChild(diceBtn);
+          }
+
+          tab.appendChild(iconsWrap);
+
+          const sep = document.createElement("span");
+          sep.className = "pm-tab-sep";
+          tab.appendChild(sep);
+
           const label = document.createElement("span");
           label.textContent = s.label;
           tab.appendChild(label);
@@ -758,16 +873,6 @@ app.registerExtension({
             countEl.textContent = count;
             tab.appendChild(countEl);
           }
-
-          const toggle = document.createElement("button");
-          toggle.className = "pm-tab-toggle";
-          toggle.innerHTML = svgIcon(s.enabled ? "eye" : "eyeOff", 14);
-          toggle.title = s.enabled ? "Section enabled — click to disable" : "Section disabled — click to enable";
-          toggle.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleSectionEnabled(s);
-          });
-          tab.appendChild(toggle);
 
           tab.addEventListener("click", () => {
             state.activeTab = s.key;
@@ -830,6 +935,19 @@ app.registerExtension({
           })
         );
 
+        const reloadBtn = mkBtn("refresh", "", "Reload selected preset (discards unsaved changes here)", async () => {
+          const current = presetSelect.value;
+          if (!current) return;
+          if (!confirm(`Reload preset "${current}"? Any unsaved changes here will be lost.`)) return;
+          try {
+            await loadPresetByName(current);
+          } catch (e) {
+            alert("Failed to reload preset: " + e.message);
+          }
+        });
+        reloadBtn.disabled = !presetSelect.value;
+        presetRowEl.appendChild(reloadBtn);
+
         const renameBtn = mkBtn("edit", "", "Rename selected preset", async () => {
           const current = presetSelect.value;
           if (!current) return;
@@ -874,6 +992,17 @@ app.registerExtension({
             renderAll();
           })
         );
+
+        const sep2 = document.createElement("div");
+        sep2.className = "pm-sep";
+        presetRowEl.appendChild(sep2);
+
+        presetRowEl.appendChild(mkBtn("eye", "", "Enable all sections", enableAllSections));
+        presetRowEl.appendChild(mkBtn("eyeOff", "", "Disable all sections", disableAllSections));
+        presetRowEl.appendChild(mkBtn("dice", "", "Randomize on queue: ON for all sections", randomizeAllSections));
+        presetRowEl.appendChild(
+          mkBtn("diceOff", "", "Randomize on queue: OFF for all sections", disableRandomizeAllSections)
+        );
       }
 
       // --- Render: section-scoped toolbar (zone 3) --------------------------------------
@@ -897,24 +1026,6 @@ app.registerExtension({
         const selectedCount = items.filter((it) => it.selected).length;
 
         sectionToolbarEl.appendChild(mkBtn("plus", "primary", "Add prompt", () => openForm(null)));
-
-        const randBtn = mkBtn(
-          "dice",
-          sec.randomizeOnQueue ? "accent-on" : "",
-          sec.randomizeOnQueue
-            ? "Randomize on queue: ON — click to disable"
-            : "Randomize on queue: OFF — click to enable",
-          () => toggleRandomizeOnQueue(sec)
-        );
-        sectionToolbarEl.appendChild(randBtn);
-
-        const clearBtn = mkBtn("close", "", "Clear selection (this section only)", () => {
-          items.forEach((it) => (it.selected = false));
-          persist();
-          renderAll();
-        });
-        clearBtn.disabled = selectedCount === 0;
-        sectionToolbarEl.appendChild(clearBtn);
 
         sectionToolbarEl.appendChild(
           mkBtn("target", "", "Enable only this section (disables all others)", () => soloSection(sec))
@@ -1005,6 +1116,15 @@ app.registerExtension({
         sectionToolbarEl.appendChild(sep2);
 
         sectionToolbarEl.appendChild(mkBtn("edit", "", "Rename section", renameSection));
+
+        const clearBtn = mkBtn("close", "", "Clear selection (this section only)", () => {
+          items.forEach((it) => (it.selected = false));
+          persist();
+          renderAll();
+        });
+        clearBtn.disabled = selectedCount === 0;
+        sectionToolbarEl.appendChild(clearBtn);
+
         const canDelete = node.pmData.sections.filter((s) => !s.locked).length > 1;
         const deleteSecBtn = mkBtn("trash", "danger", "Delete section", deleteSection);
         deleteSecBtn.disabled = !canDelete;
@@ -1207,6 +1327,7 @@ app.registerExtension({
           thumbEl.className = "pm-tile-thumb-empty";
           thumbEl.innerHTML = svgIcon("image", 26);
         }
+        thumbEl.title = item.prompt || "";
 
         const nameEl = document.createElement("div");
         nameEl.className = "pm-tile-name";
@@ -1308,7 +1429,28 @@ app.registerExtension({
         return [width, h];
       };
 
+      // Directly (and immediately) enforce the panel's pixel height. Reads
+      // the node's LIVE size[1] (not the stale pmDesiredHeight snapshot) so
+      // it stays correct even if LiteGraph grows the node on its own for
+      // reasons we never see an onResize call for. This function only
+      // ever *writes* a DOM style — it's never fed back into computeSize —
+      // so reading node.size here does not reintroduce the old feedback
+      // loop bug.
+      let pmLastAppliedHeight = null;
+      function applyDomHeight() {
+        const total = node.size && typeof node.size[1] === "number" ? node.size[1] : node.pmDesiredHeight;
+        // Leave a couple px uncovered at the bottom so the panel doesn't
+        // sit flush against the node's own edge — reads like a thin border.
+        const h = Math.max(220, total - reservedHeight() - 10);
+        if (h !== pmLastAppliedHeight) {
+          root.style.height = h + "px";
+          pmLastAppliedHeight = h;
+        }
+      }
+      applyHeightRegistry.set(node, applyDomHeight);
+
       node.setSize([500, node.pmDesiredHeight]);
+      applyDomHeight();
       persist();
       renderAll();
       refreshPresetSelect().catch(() => {});
