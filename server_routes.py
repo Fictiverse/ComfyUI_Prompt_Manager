@@ -188,8 +188,9 @@ if _AVAILABLE:
     @routes.delete("/prompt_manager/images/{filename}")
     async def pm_delete_image(request):
         filename = request.match_info.get("filename", "")
-        if _IMAGE_NAME_RE.match(filename):
-            path = os.path.join(IMAGES_DIR, filename)
-            if os.path.exists(path):
-                os.remove(path)
+        if not _IMAGE_NAME_RE.match(filename):
+            return web.json_response({"error": "invalid filename"}, status=400)
+        path = os.path.join(IMAGES_DIR, filename)
+        if os.path.exists(path):
+            os.remove(path)
         return web.json_response({"ok": True})
