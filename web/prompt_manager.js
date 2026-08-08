@@ -72,6 +72,10 @@ if (!document.getElementById(STYLE_ID)) {
   .pm-tab.pm-tab-locked.active { background:#5b3f96; color:#fff; }
   .pm-tab .pm-count { color:#8a8a8a; font-size:10px; }
   .pm-tab.active .pm-count { color:#e2f5e8; }
+  .pm-tab.pm-tab-has-selection { background:#002255; color:#fff; }
+  .pm-tab.pm-tab-has-selection:hover { background:#003366; }
+  .pm-tab.pm-tab-has-selection.active { background:#002255; box-shadow: inset 0 -2px 0 #3f9c58; }
+  .pm-tab.pm-tab-has-selection .pm-count { color:#8ab4ff; }
   .pm-tab-add { background:#1c1c1c; color:#666; min-width:0; }
   .pm-tab-add:hover { color:#3f9c58; background:#20301f; }
 
@@ -823,10 +827,15 @@ app.registerExtension({
         tabsEl.innerHTML = "";
         node.pmData.sections.forEach((s, index) => {
           const tab = document.createElement("div");
-          const count = s.locked ? "" : (node.pmData.categories[s.key] || []).length;
+          const tabItems = node.pmData.categories[s.key] || [];
+          const totalCount = s.locked ? 0 : tabItems.length;
+          const selectedCount = s.locked ? 0 : tabItems.filter((it) => it.selected).length;
+          const hasSelection = selectedCount > 0;
+          const count = s.locked ? "" : (hasSelection ? `${selectedCount}/${totalCount}` : String(totalCount));
           tab.className =
             "pm-tab" +
             (state.activeTab === s.key ? " active" : "") +
+            (hasSelection ? " pm-tab-has-selection" : "") +
             (s.locked ? " pm-tab-locked" : "") +
             (!s.enabled ? " pm-tab-disabled" : "");
           tab.draggable = true;
@@ -1194,6 +1203,7 @@ app.registerExtension({
       function toggleSelect(item) {
         item.selected = !item.selected;
         persist();
+        renderTabs();
         renderList();
         renderSectionToolbar();
         updatePreview();
