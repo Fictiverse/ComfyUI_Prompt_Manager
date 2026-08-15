@@ -17,6 +17,7 @@ import json
 import os
 import re
 import uuid
+import hashlib
 
 PRESETS_DIR = os.path.join(os.path.dirname(__file__), "presets")
 LAST_USED_FILE = os.path.join(PRESETS_DIR, ".last_used")
@@ -170,9 +171,11 @@ if _AVAILABLE:
         except Exception:
             return web.json_response({"error": "invalid base64 data"}, status=400)
         _ensure_images_dir()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        with open(os.path.join(IMAGES_DIR, filename), "wb") as fh:
-            fh.write(raw)
+        filename = f"{hashlib.md5(raw).hexdigest()}.{ext}"
+        path = os.path.join(IMAGES_DIR, filename)
+        if not os.path.exists(path):
+            with open(path, "wb") as fh:
+                fh.write(raw)
         return web.json_response({"ok": True, "filename": filename})
 
     @routes.get("/prompt_manager/images/{filename}")
