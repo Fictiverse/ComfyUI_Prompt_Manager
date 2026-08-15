@@ -1,50 +1,86 @@
 # 🗂️ Prompt Manager
 
 A ComfyUI custom node for managing a categorized, reusable library of prompt
-snippets — with reference images, drag-and-drop sections, presets, and
-queue-time randomization — all from a custom panel built into the node
-itself.
+snippets — with reference images, per-prompt fine-tuning, presets, and
+queue-time randomization — all from a custom panel built into the node.
 
-<img width="743" height="820" alt="20260802_052807" src="https://github.com/user-attachments/assets/63a04bb1-6031-40bb-9f51-e94cee0c677e" />
+<img width="1650" height="874" alt="20260814_232500" src="https://github.com/user-attachments/assets/ddbb8c46-3b94-4394-8248-914d54713acb" />
 
 
-## Features
-
-- **Custom sections** — add, rename, delete, and drag-reorder as many
-  sections as you want (Style, Camera, Character, Background, ...).
-- **Per-prompt entries** — name, prompt text, and an optional reference
-  image; list or compact grid view.
-- **Selection = output** — click a prompt to include it; the ◎ icon selects
-  only that one prompt in its section.
-- **Enable/disable per section**, independent of prompt selection.
-- **Randomize on queue** — toggle per section (or all at once); picks one
-  prompt automatically when you hit *Queue Prompt*, seeded for
-  reproducibility.
-- **Locked "Prompt" text box** — a plain multiline field that can be
-  repositioned among the sections but not deleted.
-- **Presets** saved server-side (`presets/`), picked from a dropdown, with
-  reload/rename/delete.
-- **Import/export** a single section as a portable, self-contained file
-  (images embedded).
-- **Copy / cut / paste / move** prompts between sections.
 
 ## Install
 
-Copy this folder into `ComfyUI/custom_nodes/`, restart ComfyUI. No extra
-dependencies — only `aiohttp`, already bundled with ComfyUI.
+Copy this folder into `ComfyUI/custom_nodes/` and restart ComfyUI. Only
+dependency is `aiohttp`, already bundled with ComfyUI.
 
-## How it works
+## Layout
 
-The node has one `STRING` output. For each **enabled** section, in the
-order shown in the tabs:
+| Zone | Contains |
+|---|---|
+| **Tabs** | One tab per section, drag to reorder. Each tab shows a 👁 enable/disable toggle, a 🎲 randomize-on-queue toggle, and an optional color bar. |
+| **Preset bar** | New / Save / Reload / Rename / Delete preset, list ↔ grid view toggle, raw-only & labeled-output toggles, enable/disable/randomize all sections. |
+| **Section toolbar** | Add prompt, solo this section, section color, export/import this section, rename/delete section, and a collapsible "more" panel for bulk delete/copy/cut/paste/move. |
+| **List/grid** | The prompts themselves. |
+| **Preview** | Live output text, with a mode switch (full text / names only) and a copy-to-clipboard button. |
 
-- the locked "Prompt" section contributes its text box as-is
-- any other section contributes its **selected** prompts, joined by `", "`
+## Sections
 
-Non-empty sections are then joined by `". "`.
+- Add via the **+** tab, drag any tab (including the locked **Prompt** tab)
+  to reorder.
+- 👁 enables/disables a section — disabled sections are skipped from the
+  output entirely, regardless of what's selected inside.
+- 🎨 assigns a muted color, shown as a bar on the tab for quick recognition.
+- 🎲 marks a section for **randomize-on-queue**: one prompt gets picked
+  automatically (seeded, deterministic) the moment you hit *Queue Prompt* —
+  not while editing.
+- **. toggle** — whether this section ends with a period before the next
+  one starts (on by default).
+- The locked **Prompt** tab is a plain multiline text box. It can be
+  repositioned but not renamed or deleted, and never gets a period.
 
+## Prompts
+
+Each entry has a name, prompt text, and an optional reference image.
+
+- **Click** a card/tile to select it for output (multi-select).
+- **◎ Solo** — select only this one, clearing the rest of the section.
+- **★ Always on** — always included in the output while its section is
+  enabled, regardless of selection.
+- **🎲/🚫 Allow random** — whether this prompt is eligible when
+  randomize-on-queue fires.
+- **,/␣ Comma** — whether a comma follows this prompt, or just a space.
+- List view shows full prompt text; grid view is compact tiles with a
+  button column (solo / always-on / more-actions menu / edit) and a
+  two-line name footer.
+
+## Presets
+
+Saved server-side under `presets/`, picked from the dropdown:
+
+- 📄 **New** — blank library. 💾 **Save** — save current state as a preset.
+- 🔄 **Reload** — revert to the selected preset's saved state.
+- ✎ **Rename**, 🗑 **Delete**.
+- **Export/import a single section** as its own portable file (auto
+  numbered `(1)`, `(2)`... on name collisions).
+
+Presets and exports always embed images as base64 (fully self-contained,
+easy to share). The live, actively-edited node instead references images
+as files on disk — this keeps the ComfyUI workflow file small, avoiding
+browser storage errors on large libraries. Either format loads fine either
+way; images auto-convert in the background as needed.
+
+## Output modes
+
+- **Raw only** — ignore every section, output just the text box.
+- **Labeled output** — prefix each section with its name, one per line,
+  instead of the default single-line/period-separated format.
+
+Example (default mode): `masterpiece, best quality. photorealistic, 8k. close-up shot`
+Example (labeled mode):
 ```
-masterpiece, best quality. photorealistic, ultra detailed. close-up shot
+Style: masterpiece, best quality.
+
+Camera: close-up shot.
 ```
 
 ## Files
@@ -57,4 +93,3 @@ prompt_manager_node/
 ├── presets/                 # saved presets + reference images
 └── web/prompt_manager.js    # the in-node UI
 ```
-

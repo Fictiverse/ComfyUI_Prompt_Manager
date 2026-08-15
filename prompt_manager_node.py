@@ -54,14 +54,15 @@ class PromptManagerNode:
     repositioned among the sections but not renamed or deleted.
 
     All editing (sections, entries, ordering, presets, per-section
-    enable/disable, per-section randomize-on-queue) happens through the
-    custom UI injected by web/prompt_manager.js. The "prompt_data" widget is
-    the JSON serialization of the library (persisted with the workflow); the
-    "raw_prompt" widget is a normal multiline text field whose live value is
-    NOT stored in prompt_data, and "seed" seeds the client-side
-    randomize-on-queue feature (unused directly by this function, kept as a
-    real input so it participates in the workflow/API and can be wired
-    elsewhere if useful).
+    enable/disable, per-section randomize-on-queue, raw-only mode, labeled
+    output) happens through the custom UI injected by web/prompt_manager.js.
+    The "prompt_data" widget is the JSON serialization of the whole library,
+    including the rawOnly/labeledOutput toggles (persisted with the workflow
+    and with presets); the "raw_prompt" widget is a normal multiline text
+    field whose live value is NOT stored in prompt_data; "seed" seeds the
+    client-side randomize-on-queue feature (unused directly by this
+    function, kept as a real input so it participates in the workflow/API
+    and can be wired elsewhere if useful).
 
     Output: for each enabled section, in the user-defined order:
       - the locked "Prompt" section contributes the raw_prompt text as-is
@@ -85,6 +86,10 @@ class PromptManagerNode:
                     "STRING",
                     {"multiline": True, "default": ""},
                 ),
+                "preview_mode": (
+                    "STRING",
+                    {"default": "text"},
+                ),
             }
         }
 
@@ -98,7 +103,7 @@ class PromptManagerNode:
         "section order."
     )
 
-    def build_prompt(self, prompt_data, seed, raw_prompt):
+    def build_prompt(self, prompt_data, seed, raw_prompt, preview_mode):
         try:
             data = json.loads(prompt_data) if prompt_data else default_data()
         except json.JSONDecodeError:
@@ -107,13 +112,21 @@ class PromptManagerNode:
         if not isinstance(data, dict):
             data = default_data()
 
+        raw_only = bool(data.get("rawOnly", False))
+        if raw_only:
+            return ((raw_prompt or "").strip(),)
+
+        labeled_output = bool(data.get("labeledOutput", False))
         categories = data.get("categories", {}) or {}
         sections = data.get("sections")
 
         if not sections:
             sections = [{"key": k, "label": k} for k in categories.keys()]
 
-        section_strings = []
+        # (label, text, add_period) triples, one per non-empty enabled
+        # section, in order. add_period is always False for the locked raw
+        # text section — it's free-form user text, never auto-punctuated.
+        section_parts = []
         for sec in sections:
             if not isinstance(sec, dict):
                 sec = {"key": sec, "label": sec}
@@ -121,24 +134,44 @@ class PromptManagerNode:
                 continue
 
             key = sec.get("key")
+            label = sec.get("label") or key or ""
 
             if sec.get("locked") or key == RAW_PROMPT_KEY:
                 text = (raw_prompt or "").strip()
                 if text:
-                    section_strings.append(text)
+                    section_parts.append((label, text, False))
                 continue
 
             items = categories.get(key, []) or []
-            selected_prompts = []
+            pieces = []  # (text, no_comma)
             for it in items:
                 if not isinstance(it, dict):
                     continue
-                if it.get("selected"):
+                if it.get("alwaysOn") or it.get("selected"):
                     text = (it.get("prompt") or "").strip()
                     if text:
-                        selected_prompts.append(text)
-            if selected_prompts:
-                section_strings.append(", ".join(selected_prompts))
+                        pieces.append((text, bool(it.get("noComma"))))
+            if pieces:
+                joined = ""
+                for i, (text, no_comma) in enumerate(pieces):
+                    joined += text
+                    if i < len(pieces) - 1:
+                        joined += " " if no_comma else ", "
+                add_period = sec.get("addPeriod", True) is not False
+                section_parts.append((label, joined, add_period))
 
-        final_prompt = ". ".join(section_strings)
+        if labeled_output:
+            lines = []
+            for label, text, add_period in section_parts:
+                if add_period and not text.endswith("."):
+                    text = text + "."
+                lines.append(f"{label}: {text}")
+            final_prompt = "\n\n".join(lines)
+        else:
+            final_prompt = ""
+            for i, (label, text, add_period) in enumerate(section_parts):
+                final_prompt += text
+                if i < len(section_parts) - 1:
+                    final_prompt += ". " if add_period else " "
+
         return (final_prompt,)
