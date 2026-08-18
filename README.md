@@ -4,7 +4,7 @@ A ComfyUI custom node for managing a categorized, reusable library of prompt
 snippets — with reference images, per-prompt fine-tuning, presets, and
 queue-time randomization — all from a custom panel built into the node.
 
-<img width="1650" height="874" alt="20260814_232500" src="https://github.com/user-attachments/assets/ddbb8c46-3b94-4394-8248-914d54713acb" />
+<img width="1633" height="823" alt="20260818_154232" src="https://github.com/user-attachments/assets/fbd361e3-771e-45b3-8bd8-bc1caf10bc08" />
 
 
 
