@@ -2,8 +2,7 @@ import { app } from "../../scripts/app.js";
 
 const RAW_PROMPT_KEY = "__raw_prompt__";
 
-// Muted/desaturated palette for the section color bar — kept intentionally
-// low-saturation so it reads as a quiet label, not a loud UI accent.
+// Section color tag palette (muted / low-saturation labels)
 const SECTION_COLORS = {
   red: "#a85d5d",
   green: "#5f9e73",
@@ -15,10 +14,10 @@ const SECTION_COLORS = {
 };
 
 // ---------------------------------------------------------------------------
-// Minimal, hand-drawn flat line icons (no external library / no network
-// request — everything is inline SVG using currentColor).
+// Inline SVG Icons (Feather / Lucide style, 24x24 grid)
 // ---------------------------------------------------------------------------
 const ICONS = {
+  filePlus: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/>',
   copy: '<rect x="9" y="9" width="11" height="11"/><path d="M5 15V5h11"/>',
@@ -26,6 +25,7 @@ const ICONS = {
   paste: '<rect x="6" y="4" width="12" height="17"/><rect x="9" y="2" width="6" height="4"/>',
   move: '<line x1="4" y1="12" x2="17" y2="12"/><path d="M12 6l6 6-6 6"/>',
   edit: '<path d="M4 20l4-1 11-11-3-3-11 11-1 4z"/>',
+  backspace: '<path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>',
   image: '<rect x="3" y="4" width="18" height="16"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-4 4-3-3-5 5"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
   eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
@@ -41,6 +41,7 @@ const ICONS = {
   close: '<line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/>',
   check: '<path d="M4 12l5 5 11-11"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-3.1-6.8"/><path d="M21 3v6h-6"/>',
+  type: '<polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/>',
   tag: '<path d="M20 12L12 20 4 12V4h8z"/><circle cx="8.5" cy="7.5" r="1.3"/>',
   fileText: '<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>',
   palette: '<path d="M12 2a10 10 0 1 0 0 20c1.5 0 2-1 2-2s-.5-1.5-.5-2 1-1 2-1h1a4 4 0 0 0 4-4c0-6-4-9-8.5-9z"/><circle cx="7.5" cy="10.5" r="1.2"/><circle cx="11" cy="7" r="1.2"/><circle cx="15.5" cy="8.5" r="1.2"/>',
@@ -52,13 +53,12 @@ const ICONS = {
   periodOff: '<circle cx="12" cy="18" r="2" fill="currentColor" stroke="none"/><line x1="3" y1="3" x2="21" y2="21"/>',
 };
 
-function svgIcon(name, size) {
-  size = size || 18;
+function svgIcon(name, size = 18) {
   return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
 }
 
 // ---------------------------------------------------------------------------
-// Styles
+// Stylesheet & Theme Variables
 // ---------------------------------------------------------------------------
 const STYLE_ID = "pm-style-tag";
 if (!document.getElementById(STYLE_ID)) {
@@ -66,196 +66,301 @@ if (!document.getElementById(STYLE_ID)) {
   style.id = STYLE_ID;
   style.textContent = `
   .pm-root {
+    /* --- Base Surfaces --- */
+    --pm-bg-root: #171717;
+    --pm-bg-panel-dark: #0e0e0e;
+    --pm-bg-panel-mid: #141414;
+    --pm-bg-panel-light: #1a1a1a;
+    --pm-bg-panel-alt: #202020;
+    --pm-bg-card: #232323;
+    --pm-bg-tile: #1c1c1c;
+    --pm-bg-input: #101010;
+    --pm-bg-contextual: #232030;
+
+    /* --- Text & Neutral Colors --- */
+    --pm-text-bright: #ffffff;
+    --pm-text-main: #dddddd;
+    --pm-text-soft: #eeeeee;
+    --pm-text-muted: #cccccc;
+    --pm-text-dim: #aaaaaa;
+    --pm-text-faint: #777777;
+    --pm-text-ghost: #555555;
+
+    /* --- Base Buttons & Separators --- */
+    --pm-btn-bg: #2a2a2a;
+    --pm-btn-hover: #3a3a3a;
+    --pm-sep-color: #3a3a3a;
+    --pm-tab-sep-color: #444444;
+
+    /* --- Green Theme (Selection & Active states) --- */
+    --pm-green-bg: #23633b;
+    --pm-green-hover: #2c7a49;
+    --pm-green-border: #3b9e5f;
+    --pm-green-text-soft: #a8e8b9;
+    --pm-green-text-bright: #6be37b;
+    --pm-green-text-light: #e6f7ec;
+    --pm-green-count-active: #e2f5e8;
+
+    /* --- Tabs --- */
+    --pm-tab-bg: #262626;
+    --pm-tab-hover: #333333;
+    --pm-tab-sel-bg: #2d333b;
+    --pm-tab-sel-hover: #373e48;
+    --pm-tab-sel-count: #9ab0c8;
+    --pm-tab-add-bg: #1c1c1c;
+
+    /* --- Purple Theme (Locked Prompt & Randomize) --- */
+    --pm-locked-tab-bg: #3a2e5c;
+    --pm-locked-tab-active: #5b3f96;
+    --pm-locked-tab-bar: #9a7fe0;
+    --pm-locked-tab-text: #d9c9ff;
+
+    /* --- Blue Theme (Always-On) --- */
+    --pm-always-on-bg: #1c3e5c;
+    --pm-always-on-border: #4c93d6;
+    --pm-always-on-text: #bfe0ff;
+    --pm-always-on-star-bg: rgba(42, 85, 128, 0.85);
+
+    /* --- Discreet Button Hover Tints --- */
+    --pm-tint-green-hover: #3e4d43;
+    --pm-tint-purple-hover: #45394e;
+    --pm-tint-blue-hover: #404d5a;
+    --pm-tint-red-hover: #503737;
+    --pm-danger-hover: #5c2323;
+    --pm-danger-text: #ff9d8f;
+
+    /* --- Indicators & Drag Feedback --- */
+    --pm-warn-color: #c98a4b;
+    --pm-drag-over-bg: #2a3f52;
+    --pm-drag-over-border: #4f8ef7;
+
     display: flex; flex-direction: column; width: 100%; height: 100%;
-    background: #171717; color: #ddd;
-    font-family: "Consolas","Courier New",monospace; font-size: 12px;
+    background: var(--pm-bg-root); color: var(--pm-text-main);
+    font-family: "Consolas", "Courier New", monospace; font-size: 12px;
     box-sizing: border-box; overflow: hidden; border-radius: 0;
   }
   .pm-root, .pm-root * { box-sizing: border-box; }
-  .pm-zone-tabs { background:#0e0e0e; display:flex; flex-wrap:wrap; gap:2px; padding:2px; flex-shrink:0; }
-  .pm-tab-mini-btn { background:none; border:none; color:inherit; cursor:pointer; padding:0; display:flex; opacity:0.55; }
-  .pm-tab-mini-btn:hover { opacity:1; }
-  .pm-tab-mini-btn.on-enable { opacity:1; color:#7fd48a; }
-  .pm-tab-mini-btn.on-dice { opacity:1; color:#c9b4ff; }
-  .pm-zone-preset { background:#202020; display:flex; flex-wrap:wrap; gap:2px; padding:2px 2px; align-items:center; flex-shrink:0; }
-  .pm-zone-options { background:#1a1a1a; display:flex; flex-wrap:wrap; gap:2px; padding:2px 2px; align-items:center; flex-shrink:0; }
-  .pm-zone-options .pm-btn { padding:4px 6px; }
-  .pm-toolbar-contextual { display:flex; flex-wrap:wrap; gap:1px; align-items:center; background:#232030; padding:0; }
-  .pm-zone-list { background:#141414; flex:1 1 0; overflow-y:auto; padding:2px; min-height:0; }
-  .pm-zone-preview { background:#0e0e0e; flex-shrink:0; display:flex; align-items:stretch; position:relative; }
-  .pm-preview-text { flex:1; min-width:0; padding:5px 8px; font-size:11px; color:#7fd48a; max-height:64px; overflow-y:auto; white-space:pre-wrap; }
-  .pm-preview-side { flex-shrink:0; width:20px; display:flex; flex-direction:column; gap:1px; }
-  .pm-preview-copy-btn, .pm-preview-mode-btn { flex:1; display:flex; align-items:center; justify-content:center; background:#161616; border:none; color:#888; cursor:pointer; padding:0; }
-  .pm-preview-copy-btn:hover, .pm-preview-mode-btn:hover { color:#fff; background:#242424; }
 
-  .pm-tab { display:flex; align-items:center; gap:2px; padding:6px 6px; background:#262626; cursor:pointer; color:#aaa; white-space:nowrap; border-radius:0; min-width:96px; box-sizing:border-box; }
-  .pm-tab-colorbar { width:3px; align-self:stretch; margin-right:3px; flex-shrink:0; }
-  .pm-color-picker { display:flex; align-items:center; gap:3px; background:#232030; padding:2px 4px; }
-  .pm-color-swatch { width:15px; height:15px; border:none; cursor:pointer; padding:0; flex-shrink:0; }
-  .pm-color-swatch:hover { outline:1px solid #fff; }
+  /* --- Layout Panels --- */
+  .pm-zone-tabs { background: var(--pm-bg-panel-dark); display: flex; flex-wrap: wrap; gap: 2px; padding: 2px; flex-shrink: 0; }
+  .pm-zone-preset { background: var(--pm-bg-panel-alt); display: flex; flex-wrap: wrap; gap: 2px; padding: 2px 2px; align-items: center; flex-shrink: 0; }
+  .pm-zone-options { background: var(--pm-bg-panel-light); display: flex; flex-wrap: wrap; gap: 2px; padding: 2px 2px; align-items: center; flex-shrink: 0; }
+  .pm-zone-options .pm-btn { padding: 4px 6px; }
+  .pm-toolbar-contextual { display: flex; flex-wrap: wrap; gap: 1px; align-items: center; background: var(--pm-bg-contextual); padding: 0; }
+  .pm-zone-list { background: var(--pm-bg-panel-mid); flex: 1 1 0; overflow-y: auto; padding: 2px; min-height: 0; }
+  
+  .pm-zone-preview { background: var(--pm-bg-panel-dark); flex-shrink: 0; display: flex; align-items: stretch; position: relative; }
+  .pm-preview-text { flex: 1; min-width: 0; padding: 5px 8px; font-size: 11px; color: var(--pm-green-text-bright); max-height: 64px; overflow-y: auto; white-space: pre-wrap; }
+  .pm-preview-side { flex-shrink: 0; width: 20px; display: flex; flex-direction: column; gap: 1px; }
+  .pm-preview-copy-btn, .pm-preview-mode-btn { flex: 1; display: flex; align-items: center; justify-content: center; background: #161616; border: none; color: var(--pm-text-faint); cursor: pointer; padding: 0; }
+  .pm-preview-copy-btn:hover, .pm-preview-mode-btn:hover { color: var(--pm-text-bright); background: var(--pm-btn-bg); }
+
+  /* --- Navigation Tabs --- */
+  .pm-tab { position: relative; display: flex; align-items: center; gap: 2px; padding: 6px 6px 6px 0; background: var(--pm-tab-bg); cursor: pointer; color: var(--pm-text-dim); white-space: nowrap; border-radius: 0; min-width: 96px; box-sizing: border-box; }
+  .pm-tab-colorbar { width: 6px; align-self: stretch; margin-right: 5px; flex-shrink: 0; }
+  .pm-tab-icons { display: flex; align-items: center; gap: 4px; }
+  .pm-tab-mini-btn { background: none; border: none; color: inherit; cursor: pointer; padding: 0; display: flex; opacity: 0.55; }
+  .pm-tab-mini-btn:hover { opacity: 1; }
+  .pm-tab-mini-btn.on-enable { opacity: 1; color: var(--pm-green-text-bright); }
+  .pm-tab-mini-btn.on-dice { opacity: 1; color: var(--pm-locked-tab-text); }
+  .pm-tab-sep { width: 1px; align-self: stretch; background: var(--pm-tab-sep-color); margin: 0 3px 0 3px; }
+  .pm-tab:hover { color: var(--pm-text-bright); background: var(--pm-tab-hover); }
+  .pm-tab.active { background: var(--pm-green-bg); color: var(--pm-text-bright); }
+  .pm-tab.pm-tab-disabled { filter: brightness(0.65); }
+  .pm-tab.pm-tab-disabled > * { opacity: 0.55; }
+  .pm-tab.pm-tab-locked { background: var(--pm-locked-tab-bg); color: var(--pm-locked-tab-text); }
+  .pm-tab.pm-tab-locked.active { background: var(--pm-locked-tab-active); color: var(--pm-text-bright); }
+  .pm-tab .pm-count { color: #8a8a8a; font-size: 10px; }
+  .pm-tab.active .pm-count { color: var(--pm-green-count-active); }
+  
+  .pm-tab.pm-tab-has-selection { background: var(--pm-tab-sel-bg); color: var(--pm-text-main); }
+  .pm-tab.pm-tab-has-selection:hover { background: var(--pm-tab-sel-hover); color: var(--pm-text-bright); }
+  .pm-tab.pm-tab-has-selection.active { background: var(--pm-green-bg); color: var(--pm-text-bright); }
+  .pm-tab.pm-tab-has-selection .pm-count { color: var(--pm-tab-sel-count); }
+  .pm-tab.pm-tab-has-selection.active .pm-count { color: var(--pm-green-count-active); }
+
+  .pm-tab-add {
+    background: var(--pm-tab-add-bg);
+    color: #666;
+    min-width: 28px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .pm-tab-add:hover { color: var(--pm-text-bright); background: var(--pm-green-bg); }
+
+  /* Constant green underline indicator on active tab */
+  .pm-tab.active::after {
+    content: ""; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px; background: var(--pm-green-border); z-index: 2;
+  }
+  .pm-tab.pm-tab-disabled.active::after {
+    filter: brightness(1.54);
+  }
+
+  /* --- Buttons & Inputs --- */
+  .pm-btn { display: inline-flex; align-items: center; gap: 4px; background: var(--pm-btn-bg); border: none; color: var(--pm-text-muted); padding: 6px 8px; cursor: pointer; border-radius: 0; font-family: inherit; font-size: 11px; line-height: 1; }
+  .pm-btn:hover { background: var(--pm-btn-hover); color: var(--pm-text-bright); }
+  .pm-btn:disabled { opacity: 0.3; cursor: default; }
+  .pm-btn:disabled:hover { background: var(--pm-btn-bg); color: var(--pm-text-muted); }
+  .pm-btn.danger:hover { background: var(--pm-danger-hover); color: var(--pm-danger-text); }
+  .pm-btn.primary { background: var(--pm-green-bg); color: var(--pm-green-text-light); }
+  .pm-btn.primary:hover { background: var(--pm-green-hover); color: var(--pm-text-bright); }
+  .pm-btn.accent-on { background: var(--pm-locked-tab-active); color: var(--pm-text-bright); }
+  .pm-btn.pm-flash { background: var(--pm-green-hover); color: var(--pm-text-bright); transition: background 0.15s ease; }
+  .pm-badge { font-size: 10px; background: rgba(255,255,255,0.15); padding: 0 4px; }
+
+  .pm-btn.btn-tint-green { background: var(--pm-btn-bg); color: var(--pm-green-text-soft); }
+  .pm-btn.btn-tint-green:hover { background: var(--pm-tint-green-hover); color: var(--pm-text-bright); }
+  .pm-btn.btn-tint-purple { background: var(--pm-btn-bg); color: var(--pm-locked-tab-text); }
+  .pm-btn.btn-tint-purple:hover { background: var(--pm-tint-purple-hover); color: var(--pm-text-bright); }
+  .pm-btn.btn-tint-blue { background: var(--pm-btn-bg); color: var(--pm-text-muted); }
+  .pm-btn.btn-tint-blue:hover { background: var(--pm-tint-blue-hover); color: var(--pm-text-bright); }
+  .pm-btn.btn-tint-red { background: var(--pm-btn-bg); color: var(--pm-text-muted); }
+  .pm-btn.btn-tint-red:hover { background: var(--pm-tint-red-hover); color: var(--pm-text-bright); }
+
+  .pm-select { background: var(--pm-btn-bg); border: none; color: var(--pm-text-muted); font-family: inherit; font-size: 11px; max-width: 120px; border-radius: 0; box-sizing: border-box; }
+  .pm-select-preset { height: 28px; padding: 2px 4px; }
+  .pm-select-move { height: 24px; padding: 0px 4px; font-size: 10px; }
+  .pm-hint { color: var(--pm-text-faint); font-size: 11px; }
+  .pm-sep { width: 1px; height: 20px; background: var(--pm-sep-color); margin: 0 2px; }
+
+  .pm-color-picker { display: flex; align-items: center; gap: 3px; background: var(--pm-bg-contextual); padding: 2px 4px; }
+  .pm-color-swatch { width: 15px; height: 15px; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
+  .pm-color-swatch:hover { outline: 1px solid var(--pm-text-bright); }
   .pm-color-none { background: repeating-linear-gradient(45deg,#3a3a3a,#3a3a3a 3px,#242424 3px,#242424 6px); }
-  .pm-tab-icons { display:flex; align-items:center; gap:4px; }
-  .pm-tab-sep { width:1px; align-self:stretch; background:#444; margin:0 6px 0 5px; }
-  .pm-tab:hover { color:#fff; background:#333; }
-  .pm-tab.active { background:#3f9c58; color:#fff; }
-  .pm-tab.pm-tab-disabled { opacity:0.4; }
-  .pm-tab.pm-tab-locked { background:#3a2e5c; color:#d9c9ff; }
-  .pm-tab.pm-tab-locked.active { background:#5b3f96; color:#fff; }
-  .pm-tab .pm-count { color:#8a8a8a; font-size:10px; }
-  .pm-tab.active .pm-count { color:#e2f5e8; }
-  .pm-tab.pm-tab-has-selection { background:#002255; color:#fff; }
-  .pm-tab.pm-tab-has-selection:hover { background:#003366; }
-  .pm-tab.pm-tab-has-selection.active { background:#002255; box-shadow: inset 0 -2px 0 #3f9c58; }
-  .pm-tab.pm-tab-has-selection .pm-count { color:#8ab4ff; }
-  .pm-tab-add { background:#1c1c1c; color:#666; min-width:0; }
-  .pm-tab-add:hover { color:#3f9c58; background:#20301f; }
 
-  .pm-btn { display:inline-flex; align-items:center; gap:4px; background:#2a2a2a; border:none; color:#ccc; padding:6px 8px; cursor:pointer; border-radius:0; font-family:inherit; font-size:11px; line-height:1; }
-  .pm-btn:hover { background:#3a3a3a; color:#fff; }
-  .pm-btn:disabled { opacity:0.3; cursor:default; }
-  .pm-btn:disabled:hover { background:#2a2a2a; color:#ccc; }
-  .pm-btn.danger:hover { background:#5c2323; color:#ff9d8f; }
-  .pm-btn.primary { background:#2b6b3f; color:#fff; }
-  .pm-btn.primary:hover { background:#357a49; }
-  .pm-btn.accent-on { background:#5b3f96; color:#fff; }
-  .pm-btn.pm-flash { background:#3f9c58; color:#fff; transition: background 0.15s ease; }
-  .pm-badge { font-size:10px; background:rgba(255,255,255,0.15); padding:0 4px; }
+  .pm-mode-list { display: flex; flex-direction: column; gap: 2px; }
+  .pm-mode-grid { display: flex; flex-flow: row wrap; align-content: flex-start; gap: 3px; }
 
-  .pm-select { background:#2a2a2a; border:none; color:#ccc; font-family:inherit; font-size:11px; padding:4px; max-width:120px; border-radius:0; }
-  .pm-hint { color:#777; font-size:11px; }
-  .pm-sep { width:1px; height:20px; background:#3a3a3a; margin:0 2px; }
+  /* --- List Mode Cards --- */
+  .pm-card { display: flex; gap: 8px; background: var(--pm-bg-card); padding: 2px 6px; border-radius: 0; cursor: pointer; align-items: center; }
+  .pm-card.selected { background: var(--pm-green-bg); outline: 2px solid var(--pm-green-border); outline-offset: -2px; }
+  .pm-card.drag-over { background: var(--pm-drag-over-bg); }
+  .pm-card-solo { flex-shrink: 0; color: var(--pm-text-faint); }
+  .pm-card-solo:hover { color: var(--pm-text-bright); }
+  .pm-thumb { width: 56px; height: 56px; object-fit: cover; background: #111; flex-shrink: 0; border-radius: 0; }
+  .pm-thumb-empty { width: 56px; height: 56px; flex-shrink: 0; background: var(--pm-bg-panel-light); display: flex; align-items: center; justify-content: center; color: var(--pm-text-ghost); }
+  .pm-card-body { flex: 1; min-width: 0; }
+  .pm-card-name { font-weight: bold; color: var(--pm-text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pm-card-prompt { color: #999; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+  .pm-card-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .pm-card.pm-always-on { background: var(--pm-always-on-bg); outline: 2px solid var(--pm-always-on-border); outline-offset: -2px; }
 
-  .pm-mode-list { display:flex; flex-direction:column; gap:2px; }
-  .pm-mode-grid { display:flex; flex-flow:row wrap; align-content:flex-start; gap:3px; }
-
-  /* --- list mode card --- */
-  .pm-card { display:flex; gap:8px; background:#232323; padding:2px 6px; border-radius:0; cursor:pointer; align-items:center; }
-  .pm-card.selected { background:#1f5c34; outline:2px solid #3f9c58; outline-offset:-2px; }
-  .pm-card.drag-over { background:#2a3f52; }
-  .pm-card-solo { flex-shrink:0; color:#888; }
-  .pm-card-solo:hover { color:#fff; }
-  .pm-thumb { width:56px; height:56px; object-fit:cover; background:#111; flex-shrink:0; border-radius:0; }
-  .pm-thumb-empty { width:56px;height:56px;flex-shrink:0;background:#1a1a1a;display:flex;align-items:center;justify-content:center;color:#555; }
-  .pm-card-body { flex:1; min-width:0; }
-  .pm-card-name { font-weight:bold; color:#eee; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .pm-card-prompt { color:#999; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
-  .pm-card-actions { display:flex; gap:6px; align-items:center; flex-shrink:0; }
-
-  /* --- grid / compact mode tile --- */
+  /* --- Grid Mode Tiles --- */
   .pm-tile {
-    position:relative; display:flex; flex-direction:column;
-    width:110px; box-sizing:border-box; background:#1c1c1c;
-    border-radius:0; padding:0; cursor:pointer; overflow:hidden;
-    border:2px solid transparent; flex-shrink:0;
+    position: relative; display: flex; flex-direction: column;
+    width: 110px; box-sizing: border-box; background: var(--pm-bg-tile);
+    border-radius: 0; padding: 0; cursor: pointer; overflow: hidden;
+    border: 2px solid transparent; flex-shrink: 0;
   }
-  .pm-tile.selected { border-color:#3f9c58; }
-  .pm-tile.pm-always-on { border-color:#4c93d6; }
-  .pm-tile.drag-over { outline:2px solid #4f8ef7; outline-offset:-2px; }
+  .pm-tile.selected { border-color: var(--pm-green-border); }
+  .pm-tile.pm-always-on { border-color: var(--pm-always-on-border); }
+  .pm-tile.drag-over { outline: 2px solid var(--pm-drag-over-border); outline-offset: -2px; }
 
-  /* Perfectly square media area (1:1 aspect ratio) */
   .pm-tile-media {
-    position:relative; width:100%; aspect-ratio:1 / 1; overflow:hidden;
-    box-sizing:border-box; background:#111;
+    position: relative; width: 100%; aspect-ratio: 1 / 1; overflow: hidden;
+    box-sizing: border-box; background: #111;
   }
-  .pm-tile-thumb { width:100%; height:100%; aspect-ratio:1 / 1; object-fit:cover; background:#111; border-radius:0; display:block; }
-  .pm-tile-thumb-empty { width:100%; height:100%; aspect-ratio:1 / 1; background:#1a1a1a; display:flex; align-items:center; justify-content:center; color:#555; }
+  .pm-tile-thumb { width: 100%; height: 100%; aspect-ratio: 1 / 1; object-fit: cover; background: #111; border-radius: 0; display: block; }
+  .pm-tile-thumb-empty { width: 100%; height: 100%; aspect-ratio: 1 / 1; background: var(--pm-bg-panel-light); display: flex; align-items: center; justify-content: center; color: var(--pm-text-ghost); }
 
-  /* Floating button column: transparent default, 50% grey #1a1a1a on hover */
   .pm-tile-btncol {
-    position:absolute; top:0; left:0; bottom:0; width:26px; z-index:5;
-    display:flex; flex-direction:column;
-    background:transparent;
+    position: absolute; top: 0; left: 0; bottom: 0; width: 26px; z-index: 5;
+    display: flex; flex-direction: column; background: transparent;
   }
   .pm-tile:hover .pm-tile-btncol,
   .pm-tile.menu-open .pm-tile-btncol {
-    background:rgba(26, 26, 26, 0.5);
+    background: rgba(26, 26, 26, 0.85);
   }
 
   .pm-tile-btncol button {
-    flex:1 1 0; width:100%; background:none; border:none;
-    color:#ccc; display:flex; align-items:center; justify-content:center;
-    cursor:pointer; padding:0;
+    flex: 1 1 0; width: 100%; background: none; border: none;
+    color: var(--pm-text-muted); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
   }
   .pm-tile-btncol button:hover {
-    color:#fff; background:rgba(60, 60, 60, 0.7);
+    color: var(--pm-text-bright); background: rgba(60, 60, 60, 0.7);
   }
 
-  /* Select-only button: 50% opacity (#1a1a1a) always visible */
   .pm-tile-btncol button.pm-tile-btn-select {
-    flex:2 1 0 !important;
-    color:#eee;
-    background:rgba(26, 26, 26, 0.5);
+    flex: 2 1 0 !important;
+    color: var(--pm-text-soft);
+    background: rgba(26, 26, 26, 0.5);
   }
   .pm-tile-btncol button.pm-tile-btn-select:hover {
-    color:#fff;
-    background:rgba(60, 60, 60, 0.7);
+    color: var(--pm-text-bright); background: rgba(60, 60, 60, 0.7);
   }
   .pm-tile.selected .pm-tile-btncol button.pm-tile-btn-select {
-    color:#7fd48a !important;
-    background:#1f5c34;
-  }
-  .pm-tile.pm-always-on .pm-tile-btncol button.pm-tile-btn-select {
-    color:#bfe0ff !important;
-    background:#1c3e5c;
+    color: var(--pm-green-text-soft) !important;
+    background: var(--pm-green-bg);
   }
 
-  /* Only select button stays visible; others appear on tile hover */
-  .pm-tile-btncol button:not(.pm-tile-btn-select) {
-    opacity:0;
-    pointer-events:none;
+  /* Always-on tile button states */
+  .pm-tile .pm-tile-btncol button.pm-star-on {
+    color: var(--pm-always-on-text) !important;
+    background: var(--pm-always-on-bg) !important;
   }
+  .pm-tile-btncol button.pm-star-on {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .pm-tile-btncol button:not(.pm-tile-btn-select):not(.pm-star-on) { opacity: 0; pointer-events: none; }
   .pm-tile:hover .pm-tile-btncol button:not(.pm-tile-btn-select),
   .pm-tile.menu-open .pm-tile-btncol button:not(.pm-tile-btn-select) {
-    opacity:1;
-    pointer-events:auto;
+    opacity: 1; pointer-events: auto;
   }
 
   .pm-tile-name {
-    width:100%; box-sizing:border-box; height:32px; padding:0 4px;
-    background:#1a1a1a; display:flex; align-items:center; justify-content:center; overflow:hidden;
+    width: 100%; box-sizing: border-box; height: 32px; padding: 0 4px;
+    background: var(--pm-bg-panel-light); display: flex; align-items: center; justify-content: center; overflow: hidden;
   }
   .pm-tile-name-text {
-    font-size:11px; line-height:1.25; color:#eee; text-align:center; width:100%;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    font-size: 11px; line-height: 1.25; color: var(--pm-text-soft); text-align: center; width: 100%;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
 
-  .pm-tile.selected .pm-tile-name { background:#1f5c34; }
-  .pm-tile.pm-always-on .pm-tile-name { background:#1c3e5c; }
-  .pm-tile.selected .pm-tile-name-text, .pm-tile.pm-always-on .pm-tile-name-text { color:#fff; }
-  .pm-card.pm-always-on { background:#1c3e5c; outline:2px solid #4c93d6; outline-offset:-2px; }
-  .pm-star-on { background:rgba(42,85,128,0.85); color:#bfe0ff; }
-  .pm-icon-warn { color:#c98a4b; }
+  .pm-tile.selected .pm-tile-name { background: var(--pm-green-bg); }
+  .pm-tile.pm-always-on .pm-tile-name { background: var(--pm-always-on-bg); }
+  .pm-tile.selected .pm-tile-name-text, .pm-tile.pm-always-on .pm-tile-name-text { color: var(--pm-text-bright); }
+  .pm-star-on { background: var(--pm-always-on-star-bg); color: var(--pm-always-on-text); }
+  .pm-icon-warn { color: var(--pm-warn-color); }
 
-  /* More actions overlay */
   .pm-tile-menu-overlay {
-    position:absolute; inset:0; z-index:20; background:rgba(18,18,18,0.92);
-    display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 1fr);
-    gap:1px; padding:3px; box-sizing:border-box;
+    position: absolute; inset: 0; z-index: 20; background: rgba(18,18,18,0.92);
+    display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr);
+    gap: 1px; padding: 3px; box-sizing: border-box;
   }
-  .pm-tile-grid-icon { display:flex; align-items:center; justify-content:center; background:none; border:none; color:#bbb; padding:0; }
-  .pm-tile-grid-icon:hover { color:#fff; }
-  .pm-icon-danger:hover { color:#ff9d8f; }
+  .pm-tile-grid-icon { display: flex; align-items: center; justify-content: center; background: none; border: none; color: #bbb; padding: 0; }
+  .pm-tile-grid-icon:hover { color: var(--pm-text-bright); }
+  .pm-icon-danger:hover { color: var(--pm-danger-text); }
 
-  .pm-icon-btn { background:none; border:none; color:#999; cursor:pointer; display:flex; padding:2px; }
-  .pm-icon-btn:hover { color:#fff; }
+  .pm-icon-btn { background: none; border: none; color: #999; cursor: pointer; display: flex; padding: 2px; }
+  .pm-icon-btn:hover { color: var(--pm-text-bright); }
 
-  .pm-form { background:#202020; padding:8px; display:flex; flex-direction:column; gap:6px; flex:1; min-height:0; }
-  .pm-form input[type=text], .pm-form textarea { background:#101010; border:none; color:#ddd; font-family:inherit; font-size:12px; padding:6px; width:100%; box-sizing:border-box; border-radius:0; }
-  .pm-form textarea { flex:1; min-height:0; resize:none; }
-  .pm-form-top-row { display:flex; gap:6px; align-items:center; }
-  .pm-form-actions { display:flex; gap:6px; justify-content:flex-end; flex-shrink:0; }
+  /* --- Form & Dialogs --- */
+  .pm-form { background: var(--pm-bg-panel-alt); padding: 8px; display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+  .pm-form input[type=text], .pm-form textarea { background: var(--pm-bg-input); border: none; color: var(--pm-text-main); font-family: inherit; font-size: 12px; padding: 6px; width: 100%; box-sizing: border-box; border-radius: 0; }
+  .pm-form textarea { flex: 1; min-height: 0; resize: none; }
+  .pm-form-top-row { display: flex; gap: 2px; align-items: center; }
+  .pm-form-actions { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; justify-content: flex-end; flex-shrink: 0; }
+  .pm-form-actions .pm-btn { padding: 4px 6px; }
 
-  .pm-empty-hint { color:#555; text-align:center; padding:16px 4px; font-style:italic; width:100%; }
+  .pm-empty-hint { color: var(--pm-text-ghost); text-align: center; padding: 16px 4px; font-style: italic; width: 100%; }
   .pm-raw-only-active .pm-zone-tabs,
   .pm-raw-only-active .pm-zone-options,
   .pm-raw-only-active .pm-zone-list { opacity: 0.35; }
-  .pm-hidden-file { display:none; }
+  .pm-hidden-file { display: none; }
   `;
   document.head.appendChild(style);
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers & Utilities
 // ---------------------------------------------------------------------------
 function uid() {
   return "p_" + Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
@@ -635,7 +740,7 @@ app.registerExtension({
         if (previewModeWidget.value !== "names") previewModeWidget.value = "text";
       }
 
-      // Lock raw_prompt height strictly so Node 2.0 does not expand it during vertical resize
+      // Lock raw_prompt height strictly so canvas does not expand it during vertical resize
       if (rawPromptWidget) {
         const RAW_PROMPT_FIXED_HEIGHT = 80;
         rawPromptWidget.dynamic = false;
@@ -691,7 +796,7 @@ app.registerExtension({
         return node.pmData.sections.find((s) => s.key === state.activeTab) || null;
       }
 
-      // --- Root DOM Elements ---
+      // --- Root & UI Containers ---
       const root = document.createElement("div");
       root.className = "pm-root";
 
@@ -743,7 +848,6 @@ app.registerExtension({
         }
       });
 
-      // Directly toggle between "text" and "names" mode on click
       const previewModeBtn = document.createElement("button");
       previewModeBtn.className = "pm-preview-mode-btn";
       previewModeBtn.addEventListener("click", (e) => {
@@ -771,6 +875,7 @@ app.registerExtension({
         rawPromptWidget.inputEl.addEventListener("input", () => updatePreview());
       }
 
+      // --- Hidden File Upload Inputs ---
       const fileInput = document.createElement("input");
       fileInput.type = "file";
       fileInput.accept = "image/*";
@@ -822,13 +927,13 @@ app.registerExtension({
         reader.readAsText(f);
       });
 
+      // --- Section Handlers ---
       function toggleRandomizeOnQueue(sec) {
         sec.randomizeOnQueue = !sec.randomizeOnQueue;
         persist();
         renderAll();
       }
 
-      // --- Section management ---
       function addSection() {
         const label = window.prompt("New section name:");
         if (!label || !label.trim()) return;
@@ -948,7 +1053,7 @@ app.registerExtension({
         });
       }
 
-      // --- Presets ---
+      // --- Presets Management ---
       async function fetchPresets() {
         try {
           return await fetchJSON("/prompt_manager/presets");
@@ -972,6 +1077,7 @@ app.registerExtension({
         });
         const want = selectName || last || "";
         presetSelect.value = names.includes(want) ? want : "";
+        renderPresetRow();
       }
 
       async function loadPresetByName(name) {
@@ -994,7 +1100,7 @@ app.registerExtension({
       }
 
       const presetSelect = document.createElement("select");
-      presetSelect.className = "pm-select";
+      presetSelect.className = "pm-select pm-select-preset";
       presetSelect.title = "Saved presets";
       presetSelect.addEventListener("change", async () => {
         const name = presetSelect.value;
@@ -1006,7 +1112,7 @@ app.registerExtension({
         }
       });
 
-      // --- Buttons Builder ---
+      // --- Buttons Helper ---
       function mkBtn(iconName, cls, title, onClick, badge) {
         const b = document.createElement("button");
         b.className = "pm-btn" + (cls ? " " + cls : "");
@@ -1034,9 +1140,10 @@ app.registerExtension({
           const tab = document.createElement("div");
           const tabItems = node.pmData.categories[s.key] || [];
           const totalCount = s.locked ? 0 : tabItems.length;
-          const selectedCount = s.locked ? 0 : tabItems.filter((it) => it.selected).length;
+          const selectedCount = s.locked ? 0 : tabItems.filter((it) => it.selected || it.alwaysOn).length;
           const hasSelection = selectedCount > 0;
-          const count = s.locked ? "" : (hasSelection ? `${selectedCount}/${totalCount}` : String(totalCount));
+          const count = s.locked ? "" : `${selectedCount}/${totalCount}`;
+          
           tab.className =
             "pm-tab" +
             (state.activeTab === s.key ? " active" : "") +
@@ -1047,7 +1154,7 @@ app.registerExtension({
 
           const colorBar = document.createElement("span");
           colorBar.className = "pm-tab-colorbar";
-          colorBar.style.background = s.locked ? "#9a7fe0" : s.color ? SECTION_COLORS[s.color] : "transparent";
+          colorBar.style.background = s.locked ? "var(--pm-locked-tab-bar)" : s.color ? SECTION_COLORS[s.color] : "transparent";
           tab.appendChild(colorBar);
 
           const iconsWrap = document.createElement("div");
@@ -1132,12 +1239,12 @@ app.registerExtension({
         tabsEl.appendChild(addTab);
       }
 
-      // --- Render: Preset Row ---
+      // --- Render: Preset Toolbar ---
       function renderPresetRow() {
         presetRowEl.innerHTML = "";
 
         presetRowEl.appendChild(
-          mkBtn("fileText", "", "Start a new, blank preset (discards unsaved changes here)", () => {
+          mkBtn("filePlus", "", "Start a new, blank preset (discards unsaved changes here)", () => {
             if (!confirm("Start a new blank preset? Any unsaved changes here will be lost.")) return;
             node.pmData = sanitizeData({});
             state.activeTab = node.pmData.sections.length ? node.pmData.sections[0].key : null;
@@ -1149,7 +1256,7 @@ app.registerExtension({
 
         presetRowEl.appendChild(presetSelect);
 
-        const saveBtn = mkBtn("save", "", "Save current library as a new preset", async () => {
+        const saveBtn = mkBtn("save", "btn-tint-blue", "Save current library as a new preset", async () => {
           const suggested = presetSelect.value || "";
           const name = window.prompt("Save as:", suggested);
           if (!name || !name.trim()) return;
@@ -1204,7 +1311,7 @@ app.registerExtension({
         renameBtn.disabled = !presetSelect.value;
         presetRowEl.appendChild(renameBtn);
 
-        const delBtn = mkBtn("trash", "danger", "Delete selected preset", async () => {
+        const delBtn = mkBtn("trash", "btn-tint-red", "Delete selected preset", async () => {
           const current = presetSelect.value;
           if (!current) return;
           if (!confirm(`Delete preset "${current}"? This cannot be undone.`)) return;
@@ -1237,7 +1344,7 @@ app.registerExtension({
         const rawOnlyOn = !!node.pmData.rawOnly;
         presetRowEl.appendChild(
           mkBtn(
-            "fileText",
+            "type",
             rawOnlyOn ? "accent-on" : "",
             rawOnlyOn
               ? "Raw prompt only: ON — sections are ignored, output = text box above"
@@ -1270,16 +1377,16 @@ app.registerExtension({
         sep3.className = "pm-sep";
         presetRowEl.appendChild(sep3);
 
-        presetRowEl.appendChild(mkBtn("eye", "", "Enable all sections", enableAllSections));
-        presetRowEl.appendChild(mkBtn("eyeOff", "", "Disable all sections", disableAllSections));
+        presetRowEl.appendChild(mkBtn("eye", "btn-tint-green", "Enable all sections", enableAllSections));
+        presetRowEl.appendChild(mkBtn("eyeOff", "btn-tint-green", "Disable all sections", disableAllSections));
 
         const sep4 = document.createElement("div");
         sep4.className = "pm-sep";
         presetRowEl.appendChild(sep4);
 
-        presetRowEl.appendChild(mkBtn("dice", "", "Randomize on queue: ON for all sections", randomizeAllSections));
+        presetRowEl.appendChild(mkBtn("dice", "btn-tint-purple", "Randomize on queue: ON for all sections", randomizeAllSections));
         presetRowEl.appendChild(
-          mkBtn("diceOff", "", "Randomize on queue: OFF for all sections", disableRandomizeAllSections)
+          mkBtn("diceOff", "btn-tint-purple", "Randomize on queue: OFF for all sections", disableRandomizeAllSections)
         );
       }
 
@@ -1306,13 +1413,18 @@ app.registerExtension({
         const hasClipboard = state.clipboard.length > 0;
 
         sectionToolbarEl.appendChild(mkBtn("plus", "primary", "Add prompt", () => openForm(null)));
+
+        const sep0a = document.createElement("div");
+        sep0a.className = "pm-sep";
+        sectionToolbarEl.appendChild(sep0a);
+
         sectionToolbarEl.appendChild(
           mkBtn("target", "", "Enable only this section (disables all others)", () => soloSection(sec))
         );
 
-        const sep0 = document.createElement("div");
-        sep0.className = "pm-sep";
-        sectionToolbarEl.appendChild(sep0);
+        const sep0b = document.createElement("div");
+        sep0b.className = "pm-sep";
+        sectionToolbarEl.appendChild(sep0b);
 
         sectionToolbarEl.appendChild(mkBtn("upload", "", "Export this section", exportSection));
         sectionToolbarEl.appendChild(mkBtn("download", "", "Import a section", () => importInput.click()));
@@ -1322,17 +1434,20 @@ app.registerExtension({
         sectionToolbarEl.appendChild(sep1);
 
         if (!sec.locked) {
-          sectionToolbarEl.appendChild(
-            mkBtn(
-              "palette",
-              state.colorPickerOpen ? "accent-on" : "",
-              "Set this section's color bar",
-              () => {
-                state.colorPickerOpen = !state.colorPickerOpen;
-                renderSectionToolbar();
-              }
-            )
-          );
+                  const colorBtn = mkBtn(
+                    "palette",
+                    state.colorPickerOpen ? "accent-on" : "",
+                    "Set this section's color bar",
+                    () => {
+                      state.colorPickerOpen = !state.colorPickerOpen;
+                      renderSectionToolbar();
+                    }
+                  );
+                  if (sec.color && SECTION_COLORS[sec.color]) {
+                    colorBtn.style.background = SECTION_COLORS[sec.color];
+                    colorBtn.style.color = "#fff";
+                  }
+                  sectionToolbarEl.appendChild(colorBtn);
 
           if (state.colorPickerOpen) {
             const picker = document.createElement("div");
@@ -1387,7 +1502,7 @@ app.registerExtension({
         sectionToolbarEl.appendChild(mkBtn("edit", "", "Rename section", renameSection));
 
         const canDelete = node.pmData.sections.filter((s) => !s.locked).length > 1;
-        const deleteSecBtn = mkBtn("trash", "danger", "Delete section", deleteSection);
+        const deleteSecBtn = mkBtn("trash", "btn-tint-red", "Delete section", deleteSection);
         deleteSecBtn.disabled = !canDelete;
         sectionToolbarEl.appendChild(deleteSecBtn);
 
@@ -1479,7 +1594,7 @@ app.registerExtension({
           moveIcon.innerHTML = svgIcon("move", 14);
           moveWrap.appendChild(moveIcon);
           const moveSelect = document.createElement("select");
-          moveSelect.className = "pm-select";
+          moveSelect.className = "pm-select pm-select-move";
           const optDefault = document.createElement("option");
           optDefault.textContent = "move…";
           optDefault.value = "";
@@ -1517,7 +1632,7 @@ app.registerExtension({
         }
       }
 
-      // --- Render: Add/Edit Form ---
+      // --- Render: Add / Edit Form ---
       function openForm(item) {
         formEl.style.display = "flex";
         formEl.className = "pm-form";
@@ -1567,7 +1682,7 @@ app.registerExtension({
           }
         });
 
-        const clearTextBtn = mkBtn("trash", "", "Clear the prompt text", () => {
+        const clearTextBtn = mkBtn("backspace", "", "Clear the prompt text", () => {
           promptInput.value = "";
           promptInput.focus();
         });
@@ -1624,7 +1739,7 @@ app.registerExtension({
         listEl.style.display = "";
       }
 
-      // --- Render: List / Grid Cards ---
+      // --- Render: Cards & Tiles List ---
       let itemDragSrc = null;
 
       function soloSelect(item) {
@@ -1819,7 +1934,6 @@ app.registerExtension({
           (state.openTileMenuId === item.id ? " menu-open" : "");
         attachDragReorder(tile, index);
 
-        // Close the "more actions" menu whenever the mouse leaves the tile
         tile.addEventListener("mouseleave", () => {
           if (state.openTileMenuId === item.id) {
             state.openTileMenuId = null;
@@ -1827,11 +1941,9 @@ app.registerExtension({
           }
         });
 
-        // Thumbnail image container with overlaid floating buttons
         const mediaWrap = document.createElement("div");
         mediaWrap.className = "pm-tile-media";
 
-        // Floating left button column (over the image)
         const btnCol = document.createElement("div");
         btnCol.className = "pm-tile-btncol";
 
@@ -1893,7 +2005,6 @@ app.registerExtension({
 
         tile.appendChild(mediaWrap);
 
-        // Name text footer
         const nameEl = document.createElement("div");
         nameEl.className = "pm-tile-name";
         nameEl.title = item.prompt || "";
@@ -1957,7 +2068,7 @@ app.registerExtension({
 
         node.pmData.sections.forEach((s) => {
           if (!s.enabled) return;
-          const color = s.locked ? "#9a7fe0" : s.color ? SECTION_COLORS[s.color] : null;
+          const color = s.locked ? "var(--pm-locked-tab-bar)" : s.color ? SECTION_COLORS[s.color] : null;
           let names = [];
           if (s.locked) {
             const t = rawPromptValue().trim();
@@ -1976,7 +2087,7 @@ app.registerExtension({
           if (labeledOn) {
             const labelSpan = document.createElement("span");
             labelSpan.textContent = s.label + ": ";
-            labelSpan.style.color = "#777";
+            labelSpan.style.color = "var(--pm-text-faint)";
             lineEl.appendChild(labelSpan);
           }
           names.forEach(([n, noComma], i) => {
@@ -2023,7 +2134,7 @@ app.registerExtension({
 
       renderRegistry.set(node, renderAll);
 
-      // --- DOM Widget Height Calculation ---
+      // --- Node & DOM Dimensions Calculation ---
       function reservedHeight() {
         let total = 16;
         if (!node.widgets) return total;
