@@ -1400,10 +1400,6 @@ app.registerExtension({
         sepSel.className = "pm-sep";
         presetRowEl.appendChild(sepSel);
 
-        const selHint = document.createElement("span");
-        selHint.className = "pm-hint";
-        presetRowEl.appendChild(selHint);
-
         const selSelect = document.createElement("select");
         selSelect.className = "pm-select pm-select-preset";
         selSelect.title = "Saved prompt-selection presets — each json preset file keeps its own set";
