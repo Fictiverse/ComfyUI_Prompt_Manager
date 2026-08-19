@@ -18,7 +18,7 @@ dependency is `aiohttp`, already bundled with ComfyUI.
 | Zone | Contains |
 |---|---|
 | **Tabs** | One tab per section, drag to reorder. Each tab shows a 👁 enable/disable toggle, a 🎲 randomize-on-queue toggle, and an optional color bar. |
-| **Preset bar** | New / Save / Reload / Rename / Delete preset, list ↔ grid view toggle, raw-only & labeled-output toggles, enable/disable/randomize all sections. |
+| **Preset bar** | New / Save / Reload / Rename / Delete preset, **selection presets** (dropdown + save / rename / delete, stored per json file), list ↔ grid view toggle, raw-only & labeled-output toggles, enable/disable/randomize all sections. |
 | **Section toolbar** | Add prompt, solo this section, section color, export/import this section, rename/delete section, and a collapsible "more" panel for bulk delete/copy/cut/paste/move. |
 | **List/grid** | The prompts themselves. |
 | **Preview** | Live output text, with a mode switch (full text / names only) and a copy-to-clipboard button. |
@@ -68,6 +68,26 @@ easy to share). The live, actively-edited node instead references images
 as files on disk — this keeps the ComfyUI workflow file small, avoiding
 browser storage errors on large libraries. Either format loads fine either
 way; images auto-convert in the background as needed.
+
+## Selection presets
+
+Between the preset buttons and the view toggles there's a **Selection**
+group: a dropdown plus save / rename / delete buttons. It snapshots which
+prompts are currently selected (across every section) and restores that
+selection on demand.
+
+- 💾 **Save** — capture the current selection under a name.
+- **Dropdown** — pick a saved selection to restore it immediately.
+- ✎ **Rename**, 🗑 **Delete**.
+
+Selection presets are stored *inside* each json preset file (under the
+`selectionPresets` key), so every file keeps its own set: load `Essential`
+and you get its selection presets, load another file and you get that
+one's. Saving one writes only that key back into the currently loaded
+json file — your unsaved library edits are never written to disk. If the
+node isn't tied to any file yet (e.g. a blank preset), selection presets
+still work in-memory and are stored to a file the moment the library is
+saved as a preset.
 
 ## Output modes
 
