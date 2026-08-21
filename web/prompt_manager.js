@@ -399,6 +399,11 @@ function sanitizeData(raw) {
   data.viewMode = data.viewMode === "grid" ? "grid" : "list";
   data.rawOnly = typeof data.rawOnly === "boolean" ? data.rawOnly : false;
   data.labeledOutput = typeof data.labeledOutput === "boolean" ? data.labeledOutput : false;
+  // Prompt-selection presets live inside the library data (and therefore
+  // inside each json preset file), so every file keeps its own set.
+  if (!data.selectionPresets || typeof data.selectionPresets !== "object" || Array.isArray(data.selectionPresets)) {
+    data.selectionPresets = {};
+  }
 
   const seen = new Set();
   let sections = data.sections
@@ -772,6 +777,12 @@ app.registerExtension({
         editBarOpen: false,
         colorPickerOpen: false,
         openTileMenuId: null,
+        // Name of the json preset file this node's data is currently tied to
+        // (selection presets are stored inside that file). null = blank / not
+        // saved to any file yet.
+        currentPresetName: null,
+        // Currently selected prompt-selection preset name (for the dropdown).
+        currentSelPreset: null,
       };
 
       function persist() {
@@ -1078,11 +1089,14 @@ app.registerExtension({
         const want = selectName || last || "";
         presetSelect.value = names.includes(want) ? want : "";
         renderPresetRow();
+        return { names, last };
       }
 
       async function loadPresetByName(name) {
         const parsed = await fetchJSON(`/prompt_manager/presets/${encodeURIComponent(name)}`);
         node.pmData = sanitizeData(parsed);
+        state.currentPresetName = name;
+        state.currentSelPreset = null;
         state.activeTab = node.pmData.sections.length ? node.pmData.sections[0].key : null;
         persist();
         renderAll();
@@ -1097,6 +1111,54 @@ app.registerExtension({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name }),
         }).catch(() => {});
+      }
+
+      // --- Prompt-selection presets -------------------------------------------
+      // A selection preset is a snapshot of which items are selected in each
+      // section (stored per json preset file under "selectionPresets").
+
+      function captureSelection() {
+        const sel = {};
+        node.pmData.sections.forEach((s) => {
+          if (s.locked) return;
+          sel[s.key] = (node.pmData.categories[s.key] || [])
+            .filter((it) => it.selected)
+            .map((it) => it.id);
+        });
+        return sel;
+      }
+
+      function applySelectionPreset(name) {
+        const sel = (node.pmData.selectionPresets || {})[name];
+        if (!sel || typeof sel !== "object") {
+          alert(`Selection preset "${name}" not found.`);
+          return;
+        }
+        Object.keys(sel).forEach((key) => {
+          const ids = Array.isArray(sel[key]) ? sel[key] : [];
+          const items = node.pmData.categories[key] || [];
+          items.forEach((it) => (it.selected = ids.includes(it.id)));
+        });
+        state.currentSelPreset = name;
+        persist();
+        renderAll();
+      }
+
+      // Writes the in-memory selection presets into the json preset file the
+      // node is currently tied to. Only the "selectionPresets" key of the file
+      // is touched, so unsaved library edits are never written to disk.
+      async function syncSelectionPresetsToFile() {
+        const file = state.currentPresetName;
+        if (!file) return;
+        try {
+          await fetchJSON(`/prompt_manager/presets/${encodeURIComponent(file)}/selections`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ selectionPresets: node.pmData.selectionPresets || {} }),
+          });
+        } catch (e) {
+          console.warn("PromptManager: failed to save selection presets into the json file", e);
+        }
       }
 
       const presetSelect = document.createElement("select");
@@ -1248,6 +1310,8 @@ app.registerExtension({
             if (!confirm("Start a new blank preset? Any unsaved changes here will be lost.")) return;
             node.pmData = sanitizeData({});
             state.activeTab = node.pmData.sections.length ? node.pmData.sections[0].key : null;
+            state.currentPresetName = null;
+            state.currentSelPreset = null;
             presetSelect.value = "";
             persist();
             renderAll();
@@ -1272,6 +1336,7 @@ app.registerExtension({
               body: JSON.stringify(embedded),
             });
             await refreshPresetSelect(clean);
+            state.currentPresetName = clean;
             flashButton(saveBtn);
           } catch (e) {
             alert("Failed to save preset: " + e.message);
@@ -1303,6 +1368,7 @@ app.registerExtension({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ new_name: newName.trim() }),
             });
+            if (state.currentPresetName === current) state.currentPresetName = newName.trim();
             await refreshPresetSelect(newName.trim());
           } catch (e) {
             alert("Failed to rename preset: " + e.message);
@@ -1317,6 +1383,7 @@ app.registerExtension({
           if (!confirm(`Delete preset "${current}"? This cannot be undone.`)) return;
           try {
             await fetch(`/prompt_manager/presets/${encodeURIComponent(current)}`, { method: "DELETE" });
+            if (state.currentPresetName === current) state.currentPresetName = null;
             await refreshPresetSelect("");
           } catch (e) {
             alert("Failed to delete preset: " + e.message);
@@ -1324,6 +1391,91 @@ app.registerExtension({
         });
         delBtn.disabled = !presetSelect.value;
         presetRowEl.appendChild(delBtn);
+
+        // --- Prompt-selection presets -----------------------------------------
+        // A separate group between the preset-management buttons and the
+        // view/output toggles. Selection presets are saved per json preset
+        // file (stored inside the file under "selectionPresets").
+        const sepSel = document.createElement("div");
+        sepSel.className = "pm-sep";
+        presetRowEl.appendChild(sepSel);
+
+        const selSelect = document.createElement("select");
+        selSelect.className = "pm-select pm-select-preset";
+        selSelect.title = "Saved prompt-selection presets — each json preset file keeps its own set";
+        selSelect.addEventListener("change", () => {
+          const name = selSelect.value;
+          if (!name) return;
+          applySelectionPreset(name);
+        });
+        presetRowEl.appendChild(selSelect);
+
+        const selNames = Object.keys(node.pmData.selectionPresets || {});
+        const selPlaceholder = document.createElement("option");
+        selPlaceholder.value = "";
+        selPlaceholder.textContent = "—";
+        selSelect.appendChild(selPlaceholder);
+        selNames.forEach((n) => {
+          const opt = document.createElement("option");
+          opt.value = n;
+          opt.textContent = n;
+          selSelect.appendChild(opt);
+        });
+        selSelect.value = selNames.includes(state.currentSelPreset) ? state.currentSelPreset : "";
+
+        const selSaveBtn = mkBtn(
+          "save",
+          "btn-tint-blue",
+          "Save the current prompt selection as a selection preset (stored inside this json file)",
+          async () => {
+            const suggested = state.currentSelPreset || "";
+            const name = window.prompt("Save current selection as:", suggested);
+            if (!name || !name.trim()) return;
+            const clean = name.trim();
+            if (!node.pmData.selectionPresets) node.pmData.selectionPresets = {};
+            node.pmData.selectionPresets[clean] = captureSelection();
+            state.currentSelPreset = clean;
+            persist();
+            renderPresetRow();
+            await syncSelectionPresetsToFile();
+            flashButton(selSaveBtn);
+          }
+        );
+        presetRowEl.appendChild(selSaveBtn);
+
+        const selRenameBtn = mkBtn("edit", "", "Rename the selected selection preset", async () => {
+          const current = selSelect.value;
+          if (!current) return;
+          const newName = window.prompt("Rename selection preset:", current);
+          if (!newName || !newName.trim() || newName.trim() === current) return;
+          const clean = newName.trim();
+          const map = node.pmData.selectionPresets || {};
+          if (map[clean]) {
+            alert(`A selection preset named "${clean}" already exists.`);
+            return;
+          }
+          map[clean] = map[current];
+          delete map[current];
+          state.currentSelPreset = clean;
+          persist();
+          renderPresetRow();
+          await syncSelectionPresetsToFile();
+        });
+        selRenameBtn.disabled = !selSelect.value;
+        presetRowEl.appendChild(selRenameBtn);
+
+        const selDelBtn = mkBtn("trash", "btn-tint-red", "Delete the selected selection preset", async () => {
+          const current = selSelect.value;
+          if (!current) return;
+          if (!confirm(`Delete selection preset "${current}"? This cannot be undone.`)) return;
+          delete (node.pmData.selectionPresets || {})[current];
+          state.currentSelPreset = null;
+          persist();
+          renderPresetRow();
+          await syncSelectionPresetsToFile();
+        });
+        selDelBtn.disabled = !selSelect.value;
+        presetRowEl.appendChild(selDelBtn);
 
         const sep = document.createElement("div");
         sep.className = "pm-sep";
@@ -2190,7 +2342,15 @@ app.registerExtension({
       applyDomHeight();
       persist();
       renderAll();
-      refreshPresetSelect().catch(() => {});
+      refreshPresetSelect()
+        .then((res) => {
+          // A brand-new node loads the last-used json preset (see
+          // default_data() in prompt_manager_node.py), so tie it to that file
+          // for selection-preset storage. Restored nodes keep whatever file
+          // they get tied to through an explicit load / save-as.
+          if (res && res.last) state.currentPresetName = res.last;
+        })
+        .catch(() => {});
       localizeImages(node.pmData).then((changed) => {
         if (changed) {
           persist();

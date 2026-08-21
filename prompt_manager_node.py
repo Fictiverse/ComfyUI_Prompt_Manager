@@ -11,6 +11,7 @@ _MINIMAL_FALLBACK = {
     "viewMode": "list",
     "sections": [{"key": RAW_PROMPT_KEY, "label": "Prompt", "enabled": True, "locked": True}],
     "categories": {RAW_PROMPT_KEY: []},
+    "selectionPresets": {},
 }
 
 

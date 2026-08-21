@@ -6,6 +6,9 @@ The UI talks to these routes to list / load / save / rename / delete
 presets, and to remember which preset was last used so it can be
 auto-loaded the next time ComfyUI starts (for brand-new Prompt Manager
 nodes only — existing nodes in a saved workflow keep whatever they had).
+Prompt-selection presets are stored inside each preset json file (under
+the "selectionPresets" key) via the /presets/{name}/selections route, so
+each file keeps its own set.
 
 This module is optional: if the "server" module (ComfyUI's own PromptServer)
 isn't importable (e.g. this package is inspected outside of a running
@@ -123,6 +126,40 @@ if _AVAILABLE:
         except OSError:
             pass
         return web.json_response({"ok": True, "name": new_name})
+
+    @routes.post("/prompt_manager/presets/{name}/selections")
+    async def pm_save_selections(request):
+        """Store prompt-selection presets inside a specific preset json file.
+
+        Only the file's "selectionPresets" key is replaced — the rest of the
+        file (the library itself) is left untouched, so unsaved edits in the
+        UI are never written to disk. Each json preset file keeps its own set
+        of selection presets.
+        """
+        name = _safe_name(request.match_info.get("name"))
+        if not name:
+            return web.json_response({"error": "invalid name"}, status=400)
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid json body"}, status=400)
+        selection_presets = body.get("selectionPresets")
+        if not isinstance(selection_presets, dict):
+            return web.json_response({"error": "invalid selectionPresets"}, status=400)
+        path = _path_for(name)
+        if not os.path.exists(path):
+            return web.json_response({"error": "not found"}, status=404)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        data["selectionPresets"] = selection_presets
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+        return web.json_response({"ok": True, "name": name})
 
     @routes.delete("/prompt_manager/presets/{name}")
     async def pm_delete_preset(request):
